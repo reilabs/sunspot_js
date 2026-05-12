@@ -5,11 +5,39 @@ use ark_bn254::Fr;
 pub struct R1CS {
     pub metadata: MetaData,
     pub section_header: SectionHeader,
-    pub levels: Vec<Vec<u32>>,
+    pub levels: Levels,
     pub instructions: Vec<PackedInstruction>,
     pub calldata: Vec<u32>,
     pub body: Body,
     pub coefficients: Vec<Fr>,
+}
+
+/// Flattened `levels`: one contiguous buffer plus per-level offsets, avoiding
+/// the N small allocations a `Vec<Vec<u32>>` would imply for deep circuits.
+/// `offsets.len() == count + 1`, with `offsets[0] = 0` and the tail equal to
+/// `data.len()`.
+#[derive(Debug, Clone, Default)]
+pub struct Levels {
+    pub data: Vec<u32>,
+    pub offsets: Vec<u32>,
+}
+
+impl Levels {
+    pub fn count(&self) -> usize {
+        self.offsets.len().saturating_sub(1)
+    }
+
+    pub fn get(&self, i: usize) -> &[u32] {
+        let lo = self.offsets[i] as usize;
+        let hi = self.offsets[i + 1] as usize;
+        &self.data[lo..hi]
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &[u32]> {
+        self.offsets
+            .windows(2)
+            .map(|w| &self.data[w[0] as usize..w[1] as usize])
+    }
 }
 
 /// Outer wrapper: 32 bytes at the start of every `.ccs` file.

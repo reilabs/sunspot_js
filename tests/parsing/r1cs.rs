@@ -26,7 +26,7 @@ fn sum_a_b() {
 
     // Coefficient table is non-empty and survives wrapper/section accounting.
     assert!(!r1cs.coefficients.is_empty());
-    assert_eq!(r1cs.levels.count() as usize, r1cs.levels.offsets.len() - 1);
+    assert_eq!(r1cs.levels.count(), r1cs.levels.offsets.len() - 1);
 
     // Instructions table is internally consistent.
     assert!(!r1cs.instructions.is_empty());

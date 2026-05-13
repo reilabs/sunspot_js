@@ -192,3 +192,162 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo build --all-targets
       - run: cargo test --all -- --nocapture
+
+# -----------------------------------------------------------
+# JOB 5 — WASM BENCH
+# Builds the PR HEAD *and* the base branch's wasm with the
+# `bench` feature, drives the bench harness via Playwright
+# Chromium against both, and posts a markdown diff to the PR.
+# -----------------------------------------------------------
+  bench:
+    runs-on: ubuntu-latest
+    needs: [fixtures]
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+      contents: read
+    env:
+      BENCH_ITERS: '20'
+      BENCH_FOLD_N: '4096'
+      BENCH_PROJECTS: 'poseidon2'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+
+      - name: Install Rust (wasm target)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+
+      - name: Cache cargo build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            pr -> target
+            base -> target
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build PR wasm (--features bench)
+        working-directory: pr
+        run: wasm-pack build --release --target web --features bench
+
+      - name: Build base wasm (--features bench)
+        id: base_build
+        continue-on-error: true
+        working-directory: base
+        run: wasm-pack build --release --target web --features bench
+
+      - name: Download fixtures
+        uses: actions/download-artifact@v4
+        with:
+          name: fixtures
+          path: pr/tests/noir_projects
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pr/bench/package.json') }}
+
+      - name: Install bench deps
+        working-directory: pr/bench
+        run: npm install --no-audit --no-fund
+
+      - name: Install Playwright Chromium
+        working-directory: pr/bench
+        run: npx playwright install --with-deps chromium
+
+      - name: Bench PR HEAD
+        working-directory: pr
+        run: |
+          node bench/runner.mjs \
+            --pkg ./pkg \
+            --root . \
+            --out ../head.json \
+            --projects "$BENCH_PROJECTS" \
+            --iters "$BENCH_ITERS" \
+            --foldN "$BENCH_FOLD_N" \
+            --label "${{ github.event.pull_request.head.sha }}"
+
+      - name: Bench base branch
+        if: steps.base_build.outcome == 'success'
+        working-directory: pr
+        run: |
+          node bench/runner.mjs \
+            --pkg ../base/pkg \
+            --root . \
+            --out ../base.json \
+            --projects "$BENCH_PROJECTS" \
+            --iters "$BENCH_ITERS" \
+            --foldN "$BENCH_FOLD_N" \
+            --label "${{ github.event.pull_request.base.sha }}"
+
+      - name: Render comparison
+        working-directory: pr
+        run: |
+          baseline_arg=""
+          if [ -f ../base.json ]; then baseline_arg="--baseline ../base.json"; fi
+          node bench/compare.mjs \
+            --current ../head.json \
+            $baseline_arg \
+            --out ../bench-comment.md
+          cat ../bench-comment.md
+
+      - name: Upload bench JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: |
+            head.json
+            base.json
+            bench-comment.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Post comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('bench-comment.md', 'utf-8');
+            const marker = '## sunspot_wasm bench';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(
+              c => c.user?.type === 'Bot' && c.body?.startsWith(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

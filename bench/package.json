@@ -1,0 +1,12 @@
+{
+  "name": "sunspot-wasm-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node runner.mjs",
+    "compare": "node compare.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}

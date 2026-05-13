@@ -1,0 +1,194 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  NOIR_VERSION: v1.0.0-beta.18
+  SUNSPOT_REPO: reilabs/sunspot
+  SUNSPOT_REF: main
+
+jobs:
+# -----------------------------------------------------------
+# JOB 1 — NOIR COMPILE + EXECUTE
+# Iterates every package under `tests/noir_projects/` and
+# emits ACIR JSON + witness `.gz`. Each project is discovered
+# by globbing for `Nargo.toml`, so adding a new circuit only
+# requires dropping it under `tests/noir_projects/<name>/`.
+# -----------------------------------------------------------
+  noir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: noir-lang/noirup@v0.1.2
+        with:
+          toolchain: ${{ env.NOIR_VERSION }}
+
+      - name: Compile & execute circuits
+        run: |
+          set -euxo pipefail
+          shopt -s nullglob
+          for nargo_toml in tests/noir_projects/*/Nargo.toml; do
+            project_dir="$(dirname "$nargo_toml")"
+            name="$(basename "$project_dir")"
+            echo "::group::Noir: $name"
+            (
+              cd "$project_dir"
+              nargo compile
+              if [ -f Prover.toml ]; then nargo execute; fi
+            )
+            echo "::endgroup::"
+          done
+
+      - name: Upload noir output
+        uses: actions/upload-artifact@v4
+        with:
+          name: noir-output
+          path: tests/noir_projects/*/target
+          retention-days: 1
+
+# -----------------------------------------------------------
+# JOB 2 — SUNSPOT BINARY BUILD
+# Builds the Go `sunspot` CLI from the sibling reilabs/sunspot
+# repo. Result is cached by the upstream commit SHA, so we
+# only rebuild when SUNSPOT_REF points at a new commit (or
+# when the Go version / runner OS changes).
+# -----------------------------------------------------------
+  sunspot-build:
+    runs-on: ubuntu-latest
+    env:
+      GO_VERSION: '1.24.2'
+    steps:
+      - name: Resolve sunspot SHA
+        id: sunspot-sha
+        run: |
+          set -euo pipefail
+          SHA=$(git ls-remote "https://github.com/${SUNSPOT_REPO}.git" "$SUNSPOT_REF" | awk 'NR==1 {print $1}')
+          # If the ref didn't resolve, assume it's already a commit SHA.
+          if [ -z "$SHA" ]; then SHA="$SUNSPOT_REF"; fi
+          echo "Resolved $SUNSPOT_REPO@$SUNSPOT_REF -> $SHA"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Restore sunspot binary cache
+        id: sunspot-cache
+        uses: actions/cache@v4
+        with:
+          path: sunspot-bin/sunspot
+          key: sunspot-${{ runner.os }}-go${{ env.GO_VERSION }}-${{ steps.sunspot-sha.outputs.sha }}
+
+      - uses: actions/checkout@v4
+        if: steps.sunspot-cache.outputs.cache-hit != 'true'
+        with:
+          repository: ${{ env.SUNSPOT_REPO }}
+          ref: ${{ steps.sunspot-sha.outputs.sha }}
+          path: sunspot
+
+      - uses: actions/setup-go@v4
+        if: steps.sunspot-cache.outputs.cache-hit != 'true'
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build sunspot
+        if: steps.sunspot-cache.outputs.cache-hit != 'true'
+        working-directory: sunspot/go
+        run: |
+          set -euxo pipefail
+          go mod tidy
+          go build -o sunspot -v .
+          mkdir -p "$GITHUB_WORKSPACE/sunspot-bin"
+          mv sunspot "$GITHUB_WORKSPACE/sunspot-bin/sunspot"
+
+      - name: Upload sunspot binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunspot-bin
+          path: sunspot-bin/sunspot
+          retention-days: 7
+
+# -----------------------------------------------------------
+# JOB 3 — FIXTURES
+# Combines the Noir outputs with the sunspot binary to
+# produce the full artifact set (.json, .gz, .ccs, .pk, .vk)
+# under `tests/noir_projects/<name>/target/`, which is the
+# layout `tests/mod.rs` loads from at test time.
+# -----------------------------------------------------------
+  fixtures:
+    runs-on: ubuntu-latest
+    needs: [noir, sunspot-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download noir output
+        uses: actions/download-artifact@v4
+        with:
+          name: noir-output
+          path: tests/noir_projects
+
+      - name: Download sunspot binary
+        uses: actions/download-artifact@v4
+        with:
+          name: sunspot-bin
+          path: bin
+
+      - name: Install sunspot on PATH
+        run: |
+          chmod +x bin/sunspot
+          sudo mv bin/sunspot /usr/local/bin/sunspot
+          sunspot --help > /dev/null
+
+      - name: Run sunspot compile + setup
+        run: |
+          set -euxo pipefail
+          shopt -s nullglob
+          for nargo_toml in tests/noir_projects/*/Nargo.toml; do
+            project_dir="$(dirname "$nargo_toml")"
+            name="$(basename "$project_dir")"
+            echo "::group::Fixture: $name"
+            (
+              cd "$project_dir"
+              sunspot compile "target/${name}.json"
+              sunspot setup "target/${name}.ccs"
+            )
+            echo "::endgroup::"
+          done
+
+      - name: Upload fixtures
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtures
+          path: tests/noir_projects/*/target
+          retention-days: 1
+
+# -----------------------------------------------------------
+# JOB 4 — RUST BUILD + TEST
+# Pure Rust stage: only needs the rustup toolchain. The
+# integration tests in `tests/mod.rs` consume the pre-built
+# `.json/.gz/.ccs/.pk` files; no nargo or sunspot on PATH.
+# -----------------------------------------------------------
+  rust:
+    runs-on: ubuntu-latest
+    needs: [fixtures]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: clippy, rustfmt
+
+      - name: Download fixtures
+        uses: actions/download-artifact@v4
+        with:
+          name: fixtures
+          path: tests/noir_projects
+
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo build --all-targets
+      - run: cargo test --all -- --nocapture

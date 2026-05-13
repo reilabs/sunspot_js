@@ -93,3 +93,5 @@ Cargo.lock
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/rust,go,visualstudiocode,macos
+
+node_modules

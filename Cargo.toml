@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.18", features = ["bn254"] }
 
 ark-bn254 = { version = "0.5", default-features = false, features = ["curve"] }
+ark-ec = { version = "0.5", default-features = false }
 ark-ff = { version = "0.5", default-features = false }
 
 base64 = "0.22"

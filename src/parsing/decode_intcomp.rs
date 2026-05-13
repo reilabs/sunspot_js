@@ -71,6 +71,7 @@ pub fn uncompress_uint64(input: &[u64], out: &mut Vec<u64>) {
 // Bin-pack outer loop
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::uninit_vec)]
 fn uncompress_delta_bin_pack_u32<'a>(input: &'a [u32], out: &mut Vec<u32>) -> &'a [u32] {
     let block_total = input[0] as usize;
     let mut init_offset = input[2];
@@ -78,9 +79,9 @@ fn uncompress_delta_bin_pack_u32<'a>(input: &'a [u32], out: &mut Vec<u32>) -> &'
 
     let start = out.len();
     out.reserve(block_total);
-    // SAFETY: every slot in `start..start+block_total` is written below
-    // (4 groups × 32 values per block-iteration, exactly `block_total`
-    // outputs total).
+    // SAFETY: each iteration writes exactly 128 slots (4 groups × 32) via
+    // `&mut [u32; 32]`, and `block_total` is a multiple of 128 per the format,
+    // so `start..start+block_total` is fully written before any slot is read.
     unsafe { out.set_len(start + block_total) };
     let mut outpos = start;
     let end = start + block_total;
@@ -118,6 +119,7 @@ fn uncompress_delta_bin_pack_u32<'a>(input: &'a [u32], out: &mut Vec<u32>) -> &'
     &input[inpos..]
 }
 
+#[allow(clippy::uninit_vec)]
 fn uncompress_delta_bin_pack_u64<'a>(input: &'a [u64], out: &mut Vec<u64>) -> &'a [u64] {
     let block_total = (input[0] as u32) as usize;
     let mut init_offset = input[1];
@@ -125,6 +127,9 @@ fn uncompress_delta_bin_pack_u64<'a>(input: &'a [u64], out: &mut Vec<u64>) -> &'
 
     let start = out.len();
     out.reserve(block_total);
+    // SAFETY: each iteration writes exactly 256 slots (4 groups × 64) via
+    // `&mut [u64; 64]`, and `block_total` is a multiple of 256 per the format,
+    // so `start..start+block_total` is fully written before any slot is read.
     unsafe { out.set_len(start + block_total) };
     let mut outpos = start;
     let end = start + block_total;

@@ -283,11 +283,13 @@ fn parse_blueprints(value: &ciborium::Value) -> Result<Vec<Blueprint>, ParseErro
     arr.iter().map(parse_blueprint).collect()
 }
 
+type WidthPairedUnitBlueprint = (u64, u64, fn(IntWidth) -> Blueprint);
+
 /// Each entry pairs the `(u32, u64)` tag forms of a width-parameterised unit
 /// blueprint with its `Blueprint` constructor. Enum-variant tuple constructors
 /// coerce to `fn(IntWidth) -> Blueprint`, so the table doubles as both lookup
 /// and factory.
-const WIDTH_PAIRED_UNIT_BLUEPRINTS: &[(u64, u64, fn(IntWidth) -> Blueprint)] = &[
+const WIDTH_PAIRED_UNIT_BLUEPRINTS: &[WidthPairedUnitBlueprint] = &[
     (
         TAG_GENERIC_SPARSE_R1C_U32,
         TAG_GENERIC_SPARSE_R1C_U64,

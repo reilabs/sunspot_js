@@ -6,4 +6,4 @@ mod types;
 pub mod wasm;
 
 pub use pedersen_commitments::{PedersenError, fold};
-pub use types::{GnarkWitness, PedersenProvingKey, ProvingKey, R1CS};
+pub use types::{CommitmentInfo, GnarkWitness, PedersenProvingKey, ProvingKey, R1CS, SystemType};

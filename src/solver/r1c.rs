@@ -16,16 +16,15 @@ pub(super) fn solve_generic_r1c(
     let len_a = cursor.read_u32()? as usize;
     let len_b = cursor.read_u32()? as usize;
     let len_c = cursor.read_u32()? as usize;
-    let le_a = linear_expr::read_terms(cursor, len_a)?;
-    let le_b = linear_expr::read_terms(cursor, len_b)?;
-    let le_c = linear_expr::read_terms(cursor, len_c)?;
 
     let coeffs = &solver.r1cs.coefficients;
-    let eval_a = linear_expr::partial_eval(&le_a, &solver.witness, &solver.solved, coeffs)?;
-    let eval_b = linear_expr::partial_eval(&le_b, &solver.witness, &solver.solved, coeffs)?;
-    let eval_c = linear_expr::partial_eval(&le_c, &solver.witness, &solver.solved, coeffs)?;
+    let witness = &solver.witness;
+    let solved = &solver.solved;
+    let eval_a = linear_expr::eval_terms(cursor, len_a, witness, solved, coeffs)?;
+    let eval_b = linear_expr::eval_terms(cursor, len_b, witness, solved, coeffs)?;
+    let eval_c = linear_expr::eval_terms(cursor, len_c, witness, solved, coeffs)?;
 
-    let n_unknowns = eval_a.unknowns.len() + eval_b.unknowns.len() + eval_c.unknowns.len();
+    let n_unknowns = eval_a.n_unknowns + eval_b.n_unknowns + eval_c.n_unknowns;
     if n_unknowns > 1 {
         return Err(SolveError::TooManyUnknowns {
             instr_idx,
@@ -41,7 +40,7 @@ pub(super) fn solve_generic_r1c(
         return Ok(());
     }
 
-    let (w_id, value) = if let Some(&(coeff, wid)) = eval_a.unknowns.first() {
+    let (w_id, value) = if let Some((coeff, wid)) = eval_a.unknown {
         //  value = (C/B − a) / coeff
         let value = solve_via_quotient(
             eval_c.known_sum,
@@ -51,7 +50,7 @@ pub(super) fn solve_generic_r1c(
             instr_idx,
         )?;
         (wid, value)
-    } else if let Some(&(coeff, wid)) = eval_b.unknowns.first() {
+    } else if let Some((coeff, wid)) = eval_b.unknown {
         //  value = (C/A − b) / coeff
         let value = solve_via_quotient(
             eval_c.known_sum,
@@ -62,7 +61,7 @@ pub(super) fn solve_generic_r1c(
         )?;
         (wid, value)
     } else {
-        let &(coeff, wid) = eval_c.unknowns.first().unwrap();
+        let (coeff, wid) = eval_c.unknown.unwrap();
         // value = (A·B − c) / coeff
         let coeff_inv = coeff
             .inverse()

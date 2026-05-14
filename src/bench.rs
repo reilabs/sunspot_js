@@ -12,6 +12,7 @@ use std::hint::black_box;
 use wasm_bindgen::prelude::*;
 
 use crate::pedersen_commitments::fold;
+use crate::solver::solve;
 use crate::types;
 
 fn err(e: impl std::fmt::Display) -> JsError {
@@ -124,6 +125,25 @@ pub fn bench_parse_gnark_witness(
     types::GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
     Ok(run(iterations, || {
         types::GnarkWitness::from_bytes(black_box(acir_json), black_box(witness_stack)).unwrap()
+    }))
+}
+
+/// Bench `solve` — partial witness → full witness extension, including the
+/// per-constraint A·B=C checks the blueprint solver performs along the way.
+/// R1CS and partial witness are parsed once outside the timed loop so only
+/// the solve itself is measured.
+#[wasm_bindgen]
+pub fn bench_solve(
+    ccs_bytes: &[u8],
+    acir_json: &[u8],
+    witness_stack: &[u8],
+    iterations: u32,
+) -> Result<BenchResult, JsError> {
+    let r1cs = types::R1CS::from_bytes(ccs_bytes).map_err(err)?;
+    let witness = types::GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    solve(&r1cs, &witness).map_err(err)?;
+    Ok(run(iterations, || {
+        solve(black_box(&r1cs), black_box(&witness)).unwrap()
     }))
 }
 

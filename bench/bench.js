@@ -15,6 +15,11 @@ const BENCHES = [
     needs: ["ccs"],
     call: (a, iters) => sw.bench_parse_r1cs(a.ccs, iters),
   },
+  {
+    name: "solve",
+    needs: ["ccs", "json", "gz"],
+    call: (a, iters) => sw.bench_solve(a.ccs, a.json, a.gz, iters),
+  },
 ];
 
 async function fetchBytes(path) {

@@ -79,6 +79,10 @@ async function runProject({ project, iters, foldN }) {
 async function main() {
   try {
     await init();
+    // Spin up the rayon thread pool. The wasm module is threaded — it imports
+    // shared memory and expects workers, so this must run before any solver
+    // call. Requires the page to be cross-origin isolated (COOP/COEP).
+    await sw.initThreadPool(navigator.hardwareConcurrency);
   } catch (e) {
     window.benchError =
       "failed to load wasm — did you run `wasm-pack build --release --target web --features bench`?\n\n" +

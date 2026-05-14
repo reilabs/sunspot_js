@@ -12,6 +12,7 @@ mod r1c;
 mod state;
 
 use ark_bn254::Fr;
+use rayon::prelude::*;
 
 use crate::types::Blueprint;
 use crate::{GnarkWitness, R1CS};
@@ -31,15 +32,21 @@ pub fn solve(r1cs: &R1CS, witness: &GnarkWitness) -> Result<Vec<Fr>, SolveError>
 
 fn run_solver(r1cs: &R1CS, mut solver: Solver<'_>) -> Result<Vec<Fr>, SolveError> {
     for level in r1cs.levels.iter() {
-        for &instr_idx in level {
-            run_instruction(&mut solver, instr_idx)?;
+        let writes: Vec<Option<(u32, Fr)>> = level
+            .par_iter()
+            .map(|&instr_idx| run_instruction(&solver, instr_idx))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        for write in writes.into_iter().flatten() {
+            let (w_id, value) = write;
+            solver.set_wire(w_id, value)?;
         }
     }
 
     Ok(solver.into_witness())
 }
 
-fn run_instruction(solver: &mut Solver<'_>, instr_idx: u32) -> Result<(), SolveError> {
+fn run_instruction(solver: &Solver<'_>, instr_idx: u32) -> Result<Option<(u32, Fr)>, SolveError> {
     let instr = solver
         .r1cs
         .instructions

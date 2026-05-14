@@ -7,11 +7,17 @@ use super::linear_expr::{self, PartialEval};
 use super::state::Solver;
 
 /// Solves one `BlueprintGenericR1C` instruction.
+///
+/// Pure compute: reads from `solver` but performs no writes. Returns the
+/// `(wire_id, value)` pair to commit if the constraint had one unknown, or
+/// `None` if the constraint was fully solved (verification-only branch).
+/// The caller commits writes after the parallel level finishes — see
+/// [`super::run_solver`].
 pub(super) fn solve_generic_r1c(
-    solver: &mut Solver<'_>,
+    solver: &Solver<'_>,
     cursor: &mut Cursor<'_>,
     instr_idx: u32,
-) -> Result<(), SolveError> {
+) -> Result<Option<(u32, Fr)>, SolveError> {
     let _nb_inputs = cursor.read_u32()?;
     let len_a = cursor.read_u32()? as usize;
     let len_b = cursor.read_u32()? as usize;
@@ -37,7 +43,7 @@ pub(super) fn solve_generic_r1c(
         if eval_a.known_sum * eval_b.known_sum != eval_c.known_sum {
             return Err(SolveError::ConstraintUnsatisfied { instr_idx });
         }
-        return Ok(());
+        return Ok(None);
     }
 
     let (w_id, value) = if let Some((coeff, wid)) = eval_a.unknown {
@@ -70,7 +76,7 @@ pub(super) fn solve_generic_r1c(
         (wid, value)
     };
 
-    solver.set_wire(w_id, value)
+    Ok(Some((w_id, value)))
 }
 
 /// Helper for the A- and B-side cases: solves `partial + coeff·x = num/denom`

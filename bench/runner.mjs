@@ -63,6 +63,9 @@ function startServer({ root, pkg }) {
         "Cache-Control": "no-store",
         // `bench_*` runs are heavy; let the browser hold the response open.
         "Content-Length": buf.length,
+        // Cross-origin isolation — required for SharedArrayBuffer.
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
       });
       res.end(buf);
     } catch (e) {

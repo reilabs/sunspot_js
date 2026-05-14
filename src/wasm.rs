@@ -2,11 +2,18 @@
 //! callers should reach for [`crate::types`] and the `from_bytes` methods on
 //! those types directly; this module is only a thin shim across the wasm
 //! boundary.
+//!
+//! Threading: JS must call `initThreadPool(navigator.hardwareConcurrency)`
+//! after `init()` and before invoking the solver. The host page must be
+//! cross-origin isolated (`COOP: same-origin`, `COEP: require-corp`) for
+//! `SharedArrayBuffer` to be available.
 
 use acir::AcirField;
 use wasm_bindgen::prelude::*;
 
 use crate::types;
+
+pub use wasm_bindgen_rayon::init_thread_pool;
 
 fn err(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())

@@ -29,7 +29,11 @@ impl ProvingKey {
 
         let g1_a = read_g1_vec(&mut r)?;
         let g1_b = read_g1_vec(&mut r)?;
-        let g1_z = read_g1_vec(&mut r)?;
+        // gnark ships `g1_z` bit-reversed to match its DIF-IFFT `compute_h`
+        // output (`g1_z[i] = [τ^{br(i)}·Z(τ)/δ]₁`); undo it so the prover can
+        // MSM in natural order. Length is `domain_size − 1`; `br(N−1) == N−1`.
+        let mut g1_z = read_g1_vec(&mut r)?;
+        bit_reverse_to_natural(&mut g1_z, domain.cardinality as usize);
         let g1_k = read_g1_vec(&mut r)?;
 
         let g2_beta = read_g2(&mut r)?;
@@ -141,6 +145,29 @@ fn read_g2_vec(r: &mut &[u8]) -> Result<Vec<G2Affine>, ParseError> {
         out.push(read_g2(r)?);
     }
     Ok(out)
+}
+
+/// Apply the inverse of a `log₂(domain_size)`-bit bit-reversal permutation,
+/// in place. `domain_size` must be a power of two ≥ `v.len()`. When
+/// `v.len() == domain_size - 1`, the fixed point `br(N−1) = N−1` falls
+/// outside the array — every swap pair stays in-bounds, so we don't need
+/// to pad. (The N−1 case is exactly how `pk.g1_z` is shaped.)
+fn bit_reverse_to_natural<T>(v: &mut [T], domain_size: usize) {
+    if domain_size <= 1 {
+        return;
+    }
+    debug_assert!(
+        domain_size.is_power_of_two(),
+        "bit_reverse_to_natural: domain_size must be 2^k"
+    );
+    debug_assert!(v.len() <= domain_size);
+    let log_n = domain_size.trailing_zeros();
+    for i in 0..v.len() {
+        let j = ((i as u64).reverse_bits() >> (64 - log_n)) as usize;
+        if i < j && j < v.len() {
+            v.swap(i, j);
+        }
+    }
 }
 
 fn read_bool_vec(r: &mut &[u8], n: usize) -> Result<Vec<bool>, ParseError> {

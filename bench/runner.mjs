@@ -34,12 +34,29 @@ async function fileExists(path) {
   }
 }
 
-function startServer({ root, pkg }) {
+// Resolves the package.json `"main"` entry for a pkg directory.
+async function resolvePkgMain(pkgDir) {
+  try {
+    const json = JSON.parse(
+      await readFile(resolve(pkgDir, "package.json"), "utf-8"),
+    );
+    return typeof json.main === "string" ? json.main : null;
+  } catch {
+    return null;
+  }
+}
+
+async function startServer({ root, pkg }) {
+  const pkgMain = await resolvePkgMain(pkg);
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://localhost");
       let pathname = decodeURIComponent(url.pathname);
-      if (pathname.endsWith("/")) pathname += "index.html";
+      if (pkgMain && (pathname === "/pkg" || pathname === "/pkg/")) {
+        pathname = "/pkg/" + pkgMain;
+      } else if (pathname.endsWith("/")) {
+        pathname += "index.html";
+      }
 
       let filePath;
       if (pathname.startsWith("/pkg/")) {
@@ -63,6 +80,9 @@ function startServer({ root, pkg }) {
         "Cache-Control": "no-store",
         // `bench_*` runs are heavy; let the browser hold the response open.
         "Content-Length": buf.length,
+        // Cross-origin isolation — required for SharedArrayBuffer.
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
       });
       res.end(buf);
     } catch (e) {

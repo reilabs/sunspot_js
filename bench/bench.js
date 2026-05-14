@@ -15,6 +15,11 @@ const BENCHES = [
     needs: ["ccs"],
     call: (a, iters) => sw.bench_parse_r1cs(a.ccs, iters),
   },
+  {
+    name: "solve",
+    needs: ["ccs", "json", "gz"],
+    call: (a, iters) => sw.bench_solve(a.ccs, a.json, a.gz, iters),
+  },
 ];
 
 async function fetchBytes(path) {
@@ -74,6 +79,10 @@ async function runProject({ project, iters, foldN }) {
 async function main() {
   try {
     await init();
+    /// only init threadPool on threaded builds
+    if (typeof sw.initThreadPool === "function") {
+      await sw.initThreadPool(navigator.hardwareConcurrency);
+    }
   } catch (e) {
     window.benchError =
       "failed to load wasm — did you run `wasm-pack build --release --target web --features bench`?\n\n" +

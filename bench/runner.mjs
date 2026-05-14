@@ -34,12 +34,29 @@ async function fileExists(path) {
   }
 }
 
-function startServer({ root, pkg }) {
+// Resolves the package.json `"main"` entry for a pkg directory.
+async function resolvePkgMain(pkgDir) {
+  try {
+    const json = JSON.parse(
+      await readFile(resolve(pkgDir, "package.json"), "utf-8"),
+    );
+    return typeof json.main === "string" ? json.main : null;
+  } catch {
+    return null;
+  }
+}
+
+async function startServer({ root, pkg }) {
+  const pkgMain = await resolvePkgMain(pkg);
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://localhost");
       let pathname = decodeURIComponent(url.pathname);
-      if (pathname.endsWith("/")) pathname += "index.html";
+      if (pkgMain && (pathname === "/pkg" || pathname === "/pkg/")) {
+        pathname = "/pkg/" + pkgMain;
+      } else if (pathname.endsWith("/")) {
+        pathname += "index.html";
+      }
 
       let filePath;
       if (pathname.startsWith("/pkg/")) {

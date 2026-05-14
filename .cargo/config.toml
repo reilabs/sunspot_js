@@ -9,3 +9,8 @@ rustflags = [
     "-C", "link-arg=--export=__tls_align",
     "-C", "link-arg=--export=__tls_base",
 ]
+
+# Rebuild std with the rustflags above — precompiled std lacks +atomics, 
+# so the linker rejects --shared-memory against it.
+[unstable]
+build-std = ["panic_abort", "std"]

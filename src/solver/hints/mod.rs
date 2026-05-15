@@ -20,6 +20,7 @@ mod bsb22;
 mod count;
 mod decompose;
 pub(super) mod error;
+mod grumpkin_decompose;
 mod inv_zero;
 mod n_bits;
 mod partition;
@@ -46,6 +47,7 @@ pub(super) fn solve_hint(
         HID_TO_BYTES => to_bytes::solve(solver, cursor),
         HID_SPLIT_TO_64 => split_to_64::solve(solver, cursor),
         HID_PARTITION => partition::solve(solver, cursor),
+        HID_GRUMPKIN_DECOMPOSE => grumpkin_decompose::solve(solver, cursor),
         HID_N_BITS => n_bits::solve(solver, cursor),
         _ => Err(HintError::UnknownHint { hint_id }.into()),
     }
@@ -126,6 +128,7 @@ const HID_OR: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/uints.orHint")
 const HID_TO_BYTES: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/uints.toBytes");
 const HID_SPLIT_TO_64: u32 = fnv1a32(b"sunspot/go/acir/black_box_func.splitInto64BitLimbsHint");
 const HID_PARTITION: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/bitslice.partitionHint");
+const HID_GRUMPKIN_DECOMPOSE: u32 = fnv1a32(b"sunspot/go/sw-grumpkin.decompose");
 const HID_N_BITS: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/bits.nBits");
 
 /// FNV-1a 32-bit hash, matching Go's `hash/fnv.New32a`. Used by gnark in

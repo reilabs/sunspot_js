@@ -135,7 +135,7 @@ fn fr_to_bytes(val: &Fr) -> [u8; FR_BYTES] {
 /// Matches gnark's `fr.Hash(msg, dst, 1)`: uses expand_message_xmd (RFC 9380)
 /// with `L = 48` bytes (32-byte field plus 16-byte security parameter) to
 /// produce an unbiased field element.
-fn hash_to_fr(msg: &[u8], dst: &[u8]) -> Result<Fr, PedersenError> {
+pub(crate) fn hash_to_fr(msg: &[u8], dst: &[u8]) -> Result<Fr, PedersenError> {
     // L = ceil((ceil(log2(p)) + k) / 8) where k = 128 (security parameter).
     // For BN254: ceil((254 + 128) / 8) = 48.
     const L: usize = 48;

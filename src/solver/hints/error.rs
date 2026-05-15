@@ -22,6 +22,9 @@ pub enum HintError {
     #[error("hint {hint_name}: input does not fit in u64")]
     HintInputNotUint64 { hint_name: &'static str },
 
+    #[error("hint {hint_name}: input does not fit in u128")]
+    HintInputNotUint128 { hint_name: &'static str },
+
     #[error(
         "hint {hint_name}: requires a proving key (Pedersen commitment basis) but none was provided"
     )]

@@ -51,13 +51,15 @@ fn run_solver(r1cs: &R1CS, mut solver: Solver<'_>) -> Result<Vec<Fr>, SolveError
 }
 
 fn run_instruction(solver: &Solver<'_>, instr_idx: u32) -> Result<Vec<(u32, Fr)>, SolveError> {
-    let (bp, mut cursor, _instr) = lookup_instruction(solver, instr_idx)?;
+    let (bp, mut cursor, instr) = lookup_instruction(solver, instr_idx)?;
 
     match bp {
         Blueprint::GenericR1c => r1c::solve_generic_r1c(solver, &mut cursor, instr_idx)
             .map(|w| w.map(|p| vec![p]).unwrap_or_default()),
-        Blueprint::GenericHint => Err(SolveError::BlueprintNotImplemented("generic hint")),
-        Blueprint::LookupHint { .. } => Err(SolveError::BlueprintNotImplemented("lookup hint")),
+        Blueprint::GenericHint => hints::solve_hint(solver, &mut cursor),
+        Blueprint::LookupHint {
+            entries_calldata, ..
+        } => lookup::solve_lookup(solver, &mut cursor, entries_calldata, instr.wire_offset),
         Blueprint::BatchInverse(_) => Err(SolveError::BlueprintNotImplemented("batch inverse")),
         _ => Err(SolveError::BlueprintNotImplemented(
             "Plonkish Constraints not supported",

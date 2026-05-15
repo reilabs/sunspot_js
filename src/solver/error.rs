@@ -7,7 +7,6 @@ pub enum SolveError {
     #[error(transparent)]
     Hint(#[from] HintError),
 
-
     #[error("{label} witness length mismatch: got {actual}, expected {expected}")]
     WitnessLengthMismatch {
         label: &'static str,

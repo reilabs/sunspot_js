@@ -1,7 +1,13 @@
 use thiserror::Error;
 
+use super::hints::error::HintError;
+
 #[derive(Debug, Error)]
 pub enum SolveError {
+    #[error(transparent)]
+    Hint(#[from] HintError),
+
+
     #[error("{label} witness length mismatch: got {actual}, expected {expected}")]
     WitnessLengthMismatch {
         label: &'static str,

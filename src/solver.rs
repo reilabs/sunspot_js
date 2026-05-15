@@ -7,7 +7,9 @@
 
 mod cursor;
 mod error;
+mod hints;
 mod linear_expr;
+mod lookup;
 mod r1c;
 mod state;
 
@@ -15,7 +17,7 @@ use ark_bn254::Fr;
 use rayon::prelude::*;
 
 use crate::types::Blueprint;
-use crate::{GnarkWitness, R1CS};
+use crate::{GnarkWitness, PedersenProvingKey, R1CS};
 
 pub use error::SolveError;
 
@@ -24,21 +26,23 @@ pub use self::state::Solver;
 
 /// Solves the constraint system, returning the full witness vector laid out
 /// as `[1, public..., secret..., internal...]`.
-pub fn solve(r1cs: &R1CS, witness: &GnarkWitness) -> Result<Vec<Fr>, SolveError> {
-    let solver = Solver::new(r1cs, witness)?;
-
+pub fn solve(
+    r1cs: &R1CS,
+    witness: &GnarkWitness,
+    pk: Option<&[PedersenProvingKey]>,
+) -> Result<Vec<Fr>, SolveError> {
+    let solver = Solver::new(r1cs, witness, pk)?;
     run_solver(r1cs, solver)
 }
 
 fn run_solver(r1cs: &R1CS, mut solver: Solver<'_>) -> Result<Vec<Fr>, SolveError> {
     for level in r1cs.levels.iter() {
-        let writes: Vec<Option<(u32, Fr)>> = level
+        let writes: Vec<Vec<(u32, Fr)>> = level
             .par_iter()
             .map(|&instr_idx| run_instruction(&solver, instr_idx))
             .collect::<Result<Vec<_>, _>>()?;
 
-        for write in writes.into_iter().flatten() {
-            let (w_id, value) = write;
+        for (w_id, value) in writes.into_iter().flatten() {
             solver.set_wire(w_id, value)?;
         }
     }
@@ -46,7 +50,48 @@ fn run_solver(r1cs: &R1CS, mut solver: Solver<'_>) -> Result<Vec<Fr>, SolveError
     Ok(solver.into_witness())
 }
 
-fn run_instruction(solver: &Solver<'_>, instr_idx: u32) -> Result<Option<(u32, Fr)>, SolveError> {
+fn run_instruction(solver: &Solver<'_>, instr_idx: u32) -> Result<Vec<(u32, Fr)>, SolveError> {
+    let (bp, mut cursor, _instr) = lookup_instruction(solver, instr_idx)?;
+
+    match bp {
+        Blueprint::GenericR1c => r1c::solve_generic_r1c(solver, &mut cursor, instr_idx)
+            .map(|w| w.map(|p| vec![p]).unwrap_or_default()),
+        Blueprint::GenericHint => Err(SolveError::BlueprintNotImplemented("generic hint")),
+        Blueprint::LookupHint { .. } => Err(SolveError::BlueprintNotImplemented("lookup hint")),
+        Blueprint::BatchInverse(_) => Err(SolveError::BlueprintNotImplemented("batch inverse")),
+        _ => Err(SolveError::BlueprintNotImplemented(
+            "Plonkish Constraints not supported",
+        )),
+    }
+}
+
+/// Asserts that a presolved witness satisfies every R1C constraint.
+pub fn verify_witness(r1cs: &R1CS, witness: Vec<Fr>) -> Result<(), SolveError> {
+    let solver = Solver::from_full_witness(r1cs, witness)?;
+    for level in r1cs.levels.iter() {
+        level
+            .par_iter()
+            .try_for_each(|&instr_idx| verify_instruction(&solver, instr_idx))?;
+    }
+    Ok(())
+}
+
+/// Only runs algebraic instructions
+/// Meant to be used only to verify correctness of presolved witnesses.
+fn verify_instruction(solver: &Solver<'_>, instr_idx: u32) -> Result<(), SolveError> {
+    let (bp, mut cursor, _) = lookup_instruction(solver, instr_idx)?;
+    match bp {
+        Blueprint::GenericR1c => r1c::solve_generic_r1c(solver, &mut cursor, instr_idx).map(|_| ()),
+        _ => Ok(()),
+    }
+}
+
+/// Resolves an instruction index to its blueprint, a cursor positioned at
+/// the start of its calldata, and the packed instruction itself.
+fn lookup_instruction<'a>(
+    solver: &'a Solver<'_>,
+    instr_idx: u32,
+) -> Result<(&'a Blueprint, Cursor<'a>, crate::types::PackedInstruction), SolveError> {
     let instr = solver
         .r1cs
         .instructions
@@ -68,30 +113,6 @@ fn run_instruction(solver: &Solver<'_>, instr_idx: u32) -> Result<Option<(u32, F
             total: solver.r1cs.body.blueprints.len(),
         })?;
 
-    let mut cursor = Cursor::new(&solver.r1cs.calldata, instr.start_call_data as usize)?;
-
-    match bp {
-        Blueprint::GenericR1c => r1c::solve_generic_r1c(solver, &mut cursor, instr_idx),
-        Blueprint::GenericHint => Err(SolveError::BlueprintNotImplemented("generic hint")),
-        Blueprint::LookupHint { .. } => Err(SolveError::BlueprintNotImplemented("lookup hint")),
-        Blueprint::BatchInverse(_) => Err(SolveError::BlueprintNotImplemented("batch inverse")),
-        _ => Err(SolveError::BlueprintNotImplemented(
-            "Plonkish Constraints not supported",
-        )),
-    }
-}
-
-/// Asserts that a presolved witness satisfies every R1C constraint. With all
-/// wires already solved, each blueprint solver hits its `n_unknowns == 0`
-/// branch and checks `A·B = C` in place of assigning a wire — so re-running
-/// the solver is exactly a constraint check.
-pub fn verify_witness(r1cs: &R1CS, witness: Vec<Fr>) -> Result<(), SolveError> {
-    let solver = Solver::from_full_witness(r1cs, witness)?;
-    for (wid, &is_solved) in solver.solved.iter().enumerate() {
-        // This should not happen because `Solver::from_full_witness`
-        // initialises all solved as true
-        assert!(is_solved, "verify_solving: wire {wid} is not solved");
-    }
-    run_solver(r1cs, solver)?;
-    Ok(())
+    let cursor = Cursor::new(&solver.r1cs.calldata, instr.start_call_data as usize)?;
+    Ok((bp, cursor, instr))
 }

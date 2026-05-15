@@ -3,13 +3,14 @@ use ark_bn254::Fr;
 use ark_ff::{One, Zero};
 
 use super::error::SolveError;
-use crate::{GnarkWitness, R1CS};
+use crate::{GnarkWitness, PedersenProvingKey, R1CS};
 
 /// Solver state: full witness vector + parallel "solved" bitmap.
 pub struct Solver<'a> {
     pub r1cs: &'a R1CS,
     pub witness: Vec<Fr>,
     pub solved: Vec<bool>,
+    pub pk: Option<&'a [PedersenProvingKey]>,
 }
 
 impl<'a> Solver<'a> {
@@ -18,7 +19,11 @@ impl<'a> Solver<'a> {
     ///
     /// `body.public` includes the implicit constant-1 wire as its first entry,
     /// so `gnark_witness.public.len() == body.public.len() - 1`.
-    pub fn new(r1cs: &'a R1CS, gnark_witness: &GnarkWitness) -> Result<Self, SolveError> {
+    pub fn new(
+        r1cs: &'a R1CS,
+        gnark_witness: &GnarkWitness,
+        pk: Option<&'a [PedersenProvingKey]>,
+    ) -> Result<Self, SolveError> {
         let nb_public = r1cs.body.public.len();
         let nb_user_public = nb_public.saturating_sub(1);
         let nb_secret = r1cs.body.secret.len();
@@ -58,6 +63,7 @@ impl<'a> Solver<'a> {
             r1cs,
             witness,
             solved,
+            pk,
         })
     }
 
@@ -98,6 +104,7 @@ impl<'a> Solver<'a> {
             r1cs,
             witness,
             solved,
+            pk: None,
         })
     }
 }

@@ -31,8 +31,13 @@ pub(super) fn recompose(limbs: &[Fr], nb_bits: u32) -> Wide {
     acc
 }
 
-/// Decompose `value` into `n` little-endian limbs.
-#[cfg(target_pointer_width = "64")]
+/// Decompose `value` into `n` little-endian limbs. The cfg matches the size of
+/// `crypto_bigint::Word`, which `cpubits` promotes to 64-bit on wasm32/armv7.
+#[cfg(any(
+    target_pointer_width = "64",
+    target_arch = "wasm32",
+    all(target_arch = "arm", target_feature = "v7"),
+))]
 pub(super) fn decompose(value: Wide, n: usize) -> Vec<Fr> {
     value
         .as_words()
@@ -42,7 +47,11 @@ pub(super) fn decompose(value: Wide, n: usize) -> Vec<Fr> {
         .collect()
 }
 
-#[cfg(target_pointer_width = "32")]
+#[cfg(not(any(
+    target_pointer_width = "64",
+    target_arch = "wasm32",
+    all(target_arch = "arm", target_feature = "v7"),
+)))]
 pub(super) fn decompose(value: Wide, n: usize) -> Vec<Fr> {
     let w = value.as_words();
     (0..n)

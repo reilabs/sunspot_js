@@ -17,8 +17,8 @@ const BENCHES = [
   },
   {
     name: "solve",
-    needs: ["ccs", "json", "gz"],
-    call: (a, iters) => sw.bench_solve(a.ccs, a.json, a.gz, iters),
+    needs: ["ccs", "json", "gz", "pk"],
+    call: (a, iters) => sw.bench_solve(a.ccs, a.json, a.gz, a.pk, iters),
   },
 ];
 

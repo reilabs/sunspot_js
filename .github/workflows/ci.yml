@@ -24,11 +24,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Restore noir output cache
+        id: noir-cache
+        uses: actions/cache@v4
+        with:
+          path: tests/noir_projects/*/target
+          key: noir-${{ runner.os }}-${{ env.NOIR_VERSION }}-${{ hashFiles('tests/noir_projects/**/Nargo.toml', 'tests/noir_projects/**/Prover.toml', 'tests/noir_projects/**/src/**') }}
+
       - uses: noir-lang/noirup@v0.1.2
+        if: steps.noir-cache.outputs.cache-hit != 'true'
         with:
           toolchain: ${{ env.NOIR_VERSION }}
 
       - name: Compile & execute circuits
+        if: steps.noir-cache.outputs.cache-hit != 'true'
         run: |
           set -euxo pipefail
           shopt -s nullglob
@@ -62,6 +71,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GO_VERSION: '1.24.2'
+    outputs:
+      sha: ${{ steps.sunspot-sha.outputs.sha }}
     steps:
       - name: Resolve sunspot SHA
         id: sunspot-sha
@@ -122,25 +133,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Restore fixtures cache
+        id: fixtures-cache
+        uses: actions/cache@v4
+        with:
+          path: tests/noir_projects/*/target
+          key: fixtures-${{ runner.os }}-${{ env.NOIR_VERSION }}-${{ needs.sunspot-build.outputs.sha }}-${{ hashFiles('tests/noir_projects/**/Nargo.toml', 'tests/noir_projects/**/Prover.toml', 'tests/noir_projects/**/src/**') }}
+
       - name: Download noir output
+        if: steps.fixtures-cache.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
           name: noir-output
           path: tests/noir_projects
 
       - name: Download sunspot binary
+        if: steps.fixtures-cache.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
           name: sunspot-bin
           path: bin
 
       - name: Install sunspot on PATH
+        if: steps.fixtures-cache.outputs.cache-hit != 'true'
         run: |
           chmod +x bin/sunspot
           sudo mv bin/sunspot /usr/local/bin/sunspot
           sunspot --help > /dev/null
 
       - name: Run sunspot compile + setup
+        if: steps.fixtures-cache.outputs.cache-hit != 'true'
         run: |
           set -euxo pipefail
           shopt -s nullglob
@@ -191,7 +213,7 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo build --all-targets
-      - run: cargo test --all -- --nocapture
+      - run: cargo test --all --release -- --nocapture
 
 # -----------------------------------------------------------
 # JOB 5 — WASM BENCH

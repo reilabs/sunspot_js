@@ -253,7 +253,6 @@ fn parse_body(bytes: &[u8]) -> Result<Body, ParseError> {
     expect_null_or_empty_map(map, "Logs")?;
     expect_null_or_empty_map(map, "DebugInfo")?;
     expect_empty_map(map, "MDebug")?;
-    expect_empty_map(map, "MHintsDependencies")?;
     if let Some(st) = lookup_field(map, "SymbolTable") {
         let st_map = as_map(st, "SymbolTable")?;
         expect_null_or_empty_array(st_map, "Functions")?;

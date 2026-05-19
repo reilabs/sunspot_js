@@ -131,19 +131,33 @@ pub fn bench_parse_gnark_witness(
 /// Bench `solve` — partial witness → full witness extension, including the
 /// per-constraint A·B=C checks the blueprint solver performs along the way.
 /// R1CS and partial witness are parsed once outside the timed loop so only
-/// the solve itself is measured.
+/// the solve itself is measured. `pk_bytes` is required for circuits whose
+/// hints depend on the Pedersen commitment keys (e.g. BSB22) and may be
+/// omitted for algebraic-only circuits.
 #[wasm_bindgen]
 pub fn bench_solve(
     ccs_bytes: &[u8],
     acir_json: &[u8],
     witness_stack: &[u8],
+    pk_bytes: Option<Vec<u8>>,
     iterations: u32,
 ) -> Result<BenchResult, JsError> {
     let r1cs = types::R1CS::from_bytes(ccs_bytes).map_err(err)?;
     let witness = types::GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
-    solve(&r1cs, &witness).map_err(err)?;
+    let pk = pk_bytes
+        .as_deref()
+        .map(types::ProvingKey::from_bytes)
+        .transpose()
+        .map_err(err)?;
+    let commitment_keys = pk.as_ref().map(|p| p.commitment_keys.as_slice());
+    solve(&r1cs, &witness, commitment_keys).map_err(err)?;
     Ok(run(iterations, || {
-        solve(black_box(&r1cs), black_box(&witness)).unwrap()
+        solve(
+            black_box(&r1cs),
+            black_box(&witness),
+            black_box(commitment_keys),
+        )
+        .unwrap()
     }))
 }
 

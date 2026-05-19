@@ -1,58 +1,74 @@
 //! Bigint helpers for emulated-field hints.
 use ark_bn254::Fr;
-use ark_ff::PrimeField;
-use ruint::aliases::U2048;
+use ark_ff::{BigInteger, PrimeField};
+use crypto_bigint::{I2048, U2048};
 
 /// Width used by every multi-limb operation in the emulated-mul hint family.
 pub(super) type Wide = U2048;
 
-/// Recompose a slice of limbs (each interpreted as an unsigned `nb_bits`
-/// integer in `Fr`) into a single bigint:
-///   `value = Σ limbs[i] · 2^(nb_bits · i)`
+/// Signed companion to `Wide`.
+pub(super) type SignedWide = I2048;
+
+/// Build a `Wide` from its low `N` little-endian u64 limbs, zero-padding the
+/// rest.
+pub(super) const fn wide_from_lo_limbs<const N: usize>(lo: [u64; N]) -> Wide {
+    let mut words = [0u64; Wide::LIMBS];
+    let mut i = 0;
+    while i < N {
+        words[i] = lo[i];
+        i += 1;
+    }
+    Wide::from_words(words)
+}
+
+/// Pack a slice of `nb_bits`-positioned limbs (as `Fr`) into a `Wide`.
 pub(super) fn recompose(limbs: &[Fr], nb_bits: u32) -> Wide {
     let mut acc = Wide::ZERO;
     for limb in limbs.iter().rev() {
-        acc <<= nb_bits as usize;
-        acc += fr_to_wide(limb);
+        acc <<= nb_bits;
+        acc = acc.wrapping_add(&field_to_wide(limb));
     }
     acc
 }
 
-/// Decompose `value` into `n` little-endian limbs of `nb_bits` bits each,
-/// returning each limb as `Fr`.
-pub(super) fn decompose(value: Wide, nb_bits: u32, n: usize) -> Vec<Fr> {
-    let mask = limb_mask(nb_bits);
-    let mut out = Vec::with_capacity(n);
-    let mut tmp = value;
-    for _ in 0..n {
-        let limb = tmp & mask;
-        out.push(wide_to_fr(&limb));
-        tmp >>= nb_bits as usize;
-    }
-    out
+/// Decompose `value` into `n` little-endian limbs.
+#[cfg(target_pointer_width = "64")]
+pub(super) fn decompose(value: Wide, n: usize) -> Vec<Fr> {
+    value
+        .as_words()
+        .iter()
+        .take(n)
+        .map(|w| Fr::from(*w))
+        .collect()
 }
 
-/// `(1 << nb_bits) - 1`, used to mask off one limb at a time.
-fn limb_mask(nb_bits: u32) -> Wide {
-    if nb_bits == 0 {
-        Wide::ZERO
-    } else {
-        (Wide::from(1u64) << (nb_bits as usize)) - Wide::from(1u64)
-    }
+#[cfg(target_pointer_width = "32")]
+pub(super) fn decompose(value: Wide, n: usize) -> Vec<Fr> {
+    let w = value.as_words();
+    (0..n)
+        .map(|i| Fr::from(((w[2 * i + 1] as u64) << 32) | w[2 * i] as u64))
+        .collect()
 }
 
-/// Convert an `Fr` element to a `Wide` (zero-padded). The Fr's bigint
-/// representation already gives us the limbs in canonical order.
-pub(super) fn fr_to_wide(x: &Fr) -> Wide {
-    let limbs = x.into_bigint().0; // [u64; 4], little-endian
-    let mut wide_limbs = [0u64; <Wide>::LIMBS];
-    wide_limbs[..limbs.len()].copy_from_slice(&limbs);
-    Wide::from_limbs(wide_limbs)
+/// Convert any `PrimeField` element to a `Wide`.
+pub(super) fn field_to_wide<F: PrimeField>(x: &F) -> Wide {
+    let bytes = x.into_bigint().to_bytes_le();
+    let mut padded = [0u8; 256];
+    padded[..bytes.len()].copy_from_slice(&bytes);
+    Wide::from_le_slice(&padded)
 }
 
-/// Reduce a `Wide` mod the BN254 scalar field and return as `Fr`.
-pub(super) fn wide_to_fr(x: &Wide) -> Fr {
-    Fr::from_le_bytes_mod_order(&x.to_le_bytes_vec())
+/// Reduce a `Wide` to a `PrimeField` Element.
+pub(super) fn wide_to_field<F: PrimeField>(x: &Wide) -> F {
+    F::from_le_bytes_mod_order(&x.to_le_bytes())
+}
+
+/// Reduce a `SignedWide` to a `PrimeField` Element. Negative values map to
+/// `r − |x|`, matching how gnark's witness machinery stores them.
+pub(super) fn signed_to_field<F: PrimeField>(x: &SignedWide) -> F {
+    let (abs, is_neg) = x.abs_sign();
+    let abs_f: F = wide_to_field(&abs);
+    if bool::from(is_neg) { -abs_f } else { abs_f }
 }
 
 /// `nbMultiplicationResLimbs` — the number of limbs needed to hold the
@@ -68,7 +84,7 @@ pub(super) fn limb_mul(lhs: &[Wide], rhs: &[Wide]) -> Vec<Wide> {
     let mut res = vec![Wide::ZERO; n];
     for i in 0..lhs.len() {
         for j in 0..rhs.len() {
-            res[i + j] = res[i + j].wrapping_add(lhs[i].wrapping_mul(rhs[j]));
+            res[i + j] = res[i + j].wrapping_add(&lhs[i].wrapping_mul(&rhs[j]));
         }
     }
     res

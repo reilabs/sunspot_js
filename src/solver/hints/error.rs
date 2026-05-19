@@ -46,4 +46,13 @@ pub enum HintError {
 
     #[error("lookup index {idx} out of range (table has {total} entries)")]
     LookupIndexOutOfRange { idx: usize, total: usize },
+
+    #[error("hint {hint_name}: input has no modular inverse (gcd ≠ 1)")]
+    HintNoModInverse { hint_name: &'static str },
+
+    #[error("hint {hint_name}: unsupported curve (lambda = 0x{lambda_hex})")]
+    UnsupportedCurve {
+        hint_name: &'static str,
+        lambda_hex: String,
+    },
 }

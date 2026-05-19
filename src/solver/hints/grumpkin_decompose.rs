@@ -38,5 +38,7 @@ pub(super) fn solve(
         .into());
     }
     let limbs = s.into_bigint().0; // [u64; 4], little-endian
-    Ok((0..4).map(|i| (start + i as u32, Fr::from(limbs[i]))).collect())
+    Ok((0..4)
+        .map(|i| (start + i as u32, Fr::from(limbs[i])))
+        .collect())
 }

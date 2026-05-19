@@ -133,3 +133,51 @@ fn memory() {
     let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
+
+/// 3-point Grumpkin multi-scalar multiplication. Exercises `emulated.mulHint`
+/// (BN254 Fp emulated multiplication) and the GLV scalar split via
+/// `sw-grumpkin.decomposeScalar` + `sw-grumpkin.decompose`.
+#[test]
+fn multiscalar_multiplication() {
+    let r1cs = r1cs("multiscalar_multiplication");
+    let partial = gnark_witness("multiscalar_multiplication");
+    let pk = proving_key("multiscalar_multiplication");
+
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
+}
+
+/// Recursive aggregation — exercises `halfGCDEisenstein`, `divE2Hint` and
+/// `inverseE12Hint` on top of the M9/M10 hint set.
+#[test]
+fn recursive_aggregation() {
+    let r1cs = r1cs("recursive_aggregation");
+    let partial = gnark_witness("recursive_aggregation");
+    let pk = proving_key("recursive_aggregation");
+
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
+}
+
+/// ECDSA signature verification on secp256r1 — exercises the non-GLV
+/// scalar-mul path (`halfGCD` instead of `decomposeScalarG1`).
+#[test]
+fn ecdsa_secp256r1() {
+    let r1cs = r1cs("ecdsa_secp256r1");
+    let partial = gnark_witness("ecdsa_secp256r1");
+    let pk = proving_key("ecdsa_secp256r1");
+
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
+}
+
+/// ECDSA signature verification on secp256k1 — first T5 milestone.
+#[test]
+fn ecdsa_secp256k1() {
+    let r1cs = r1cs("ecdsa_secp256k1");
+    let partial = gnark_witness("ecdsa_secp256k1");
+    let pk = proving_key("ecdsa_secp256k1");
+
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
+}

@@ -20,17 +20,28 @@ mod bitwise;
 mod bsb22;
 mod count;
 mod decompose;
+mod eisenstein_integers;
+mod emulated_div;
 mod emulated_mul;
+mod emulated_shared;
 pub(super) mod error;
+mod fields_bn254;
+mod glv_lattice;
 mod grumpkin_decompose;
 mod grumpkin_split;
 mod inv_zero;
 mod n_bits;
 mod partition;
+mod poly_mv;
 mod randomize;
 mod split_to_64;
+mod sw_decompose_scalar;
+mod sw_half_gcd;
+mod sw_half_gcd_eisenstein;
+mod sw_scalar_mul;
 mod to_bytes;
 
+pub(super) const HINT_HEADER_LEN: usize = 6;
 /// Entry point for a `Blueprint::GenericHint` instruction.
 pub(super) fn solve_hint(
     solver: &Solver<'_>,
@@ -51,9 +62,18 @@ pub(super) fn solve_hint(
         HID_SPLIT_TO_64 => split_to_64::solve(solver, cursor),
         HID_PARTITION => partition::solve(solver, cursor),
         HID_EMU_MUL => emulated_mul::solve(solver, cursor),
+        HID_EMU_DIV => emulated_div::solve_div(solver, cursor),
+        HID_EMU_INVERSE => emulated_div::solve_inverse(solver, cursor),
+        HID_DIV_E2 => fields_bn254::solve_div_e2(solver, cursor),
+        HID_INVERSE_E12 => fields_bn254::solve_inverse_e12(solver, cursor),
         HID_GRUMPKIN_DECOMPOSE_SCALAR => grumpkin_split::solve(solver, cursor),
         HID_GRUMPKIN_DECOMPOSE => grumpkin_decompose::solve(solver, cursor),
+        HID_SW_DECOMPOSE_SCALAR_G1 => sw_decompose_scalar::solve(solver, cursor),
+        HID_SW_SCALAR_MUL => sw_scalar_mul::solve(solver, cursor),
+        HID_SW_HALF_GCD => sw_half_gcd::solve(solver, cursor),
+        HID_SW_HALF_GCD_EISENSTEIN => sw_half_gcd_eisenstein::solve(solver, cursor),
         HID_N_BITS => n_bits::solve(solver, cursor),
+        HID_POLY_MV => poly_mv::solve(solver, cursor),
         _ => Err(HintError::UnknownHint { hint_id }.into()),
     }
 }
@@ -134,9 +154,24 @@ const HID_TO_BYTES: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/uints.to
 const HID_SPLIT_TO_64: u32 = fnv1a32(b"sunspot/go/acir/black_box_func.splitInto64BitLimbsHint");
 const HID_PARTITION: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/bitslice.partitionHint");
 const HID_EMU_MUL: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/emulated.mulHint");
+const HID_EMU_DIV: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/emulated.DivHint");
+const HID_EMU_INVERSE: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/emulated.InverseHint");
+const HID_DIV_E2: u32 =
+    fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/fields_bn254.divE2Hint");
+const HID_INVERSE_E12: u32 =
+    fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/fields_bn254.inverseE12Hint");
 const HID_GRUMPKIN_DECOMPOSE_SCALAR: u32 = fnv1a32(b"sunspot/go/sw-grumpkin.decomposeScalar");
 const HID_GRUMPKIN_DECOMPOSE: u32 = fnv1a32(b"sunspot/go/sw-grumpkin.decompose");
+const HID_SW_DECOMPOSE_SCALAR_G1: u32 =
+    fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/sw_emulated.decomposeScalarG1");
+const HID_SW_SCALAR_MUL: u32 =
+    fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/sw_emulated.scalarMulHint");
+const HID_SW_HALF_GCD: u32 =
+    fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/sw_emulated.halfGCD");
+const HID_SW_HALF_GCD_EISENSTEIN: u32 =
+    fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/sw_emulated.halfGCDEisenstein");
 const HID_N_BITS: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/bits.nBits");
+const HID_POLY_MV: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/emulated.polyMvHint");
 
 /// FNV-1a 32-bit hash, matching Go's `hash/fnv.New32a`. Used by gnark in
 /// `csolver.GetHintID` to derive HintIDs from fully qualified function names.

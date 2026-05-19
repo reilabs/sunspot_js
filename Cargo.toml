@@ -15,14 +15,17 @@ acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.18", feat
 ark-bn254 = { version = "0.5", default-features = false, features = ["curve"] }
 ark-ec = { version = "0.5", default-features = false }
 ark-ff = { version = "0.5", default-features = false }
+ark-grumpkin = { version = "0.5", default-features = false }
+ark-secp256k1 = { version = "0.5", default-features = false }
+ark-secp256r1 = { version = "0.5", default-features = false }
 ark-serialize = { version = "0.5", default-features = false }
 
 base64 = "0.22"
 byteorder = "1.5"
 ciborium = "0.2"
+crypto-bigint = "0.7"
 rand = "0.8"
 rayon = "1.10"
-ruint = "1"
 serde_json = "1"
 sha2 = { version = "0.10", default-features = false }
 thiserror = "2"

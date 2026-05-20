@@ -38,6 +38,11 @@ fn keccak_f1600() {
     run::<0, 1>("keccak_f1600");
 }
 
+#[test]
+fn passport_like() {
+    run::<128, 1>("passport_like");
+}
+
 fn run<const NR_INPUTS: usize, const N_COMMITMENTS: usize>(name: &str) {
     let r1cs = r1cs(name);
     let partial = gnark_witness(name);

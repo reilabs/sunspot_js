@@ -11,7 +11,7 @@ fn polynomial() {
     let r1cs = r1cs("polynomial");
     let partial = gnark_witness("polynomial");
 
-    let full = solve(&r1cs, &partial, None).expect("solve");
+    let full = solve(&r1cs, &partial, None).expect("solve").witness;
     assert_eq!(full[0], Fr::one());
     assert_eq!(full[1], Fr::from(177u64));
 
@@ -24,7 +24,7 @@ fn poseidon2() {
     let r1cs = r1cs("poseidon2");
     let partial = gnark_witness("poseidon2");
 
-    let full = solve(&r1cs, &partial, None).expect("solve");
+    let full = solve(&r1cs, &partial, None).expect("solve").witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -34,7 +34,7 @@ fn embedded_curve_add() {
     let r1cs = r1cs("embedded_curve_add");
     let partial = gnark_witness("embedded_curve_add");
 
-    let full = solve(&r1cs, &partial, None).expect("solve");
+    let full = solve(&r1cs, &partial, None).expect("solve").witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -45,7 +45,9 @@ fn range() {
     let partial = gnark_witness("range");
     let pk = proving_key("range");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -56,7 +58,9 @@ fn xor() {
     let partial = gnark_witness("xor");
     let pk = proving_key("xor");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -67,7 +71,9 @@ fn and() {
     let partial = gnark_witness("and");
     let pk = proving_key("and");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -78,7 +84,9 @@ fn blake2s() {
     let partial = gnark_witness("blake2s");
     let pk = proving_key("blake2s");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -88,7 +96,9 @@ fn blake3() {
     let partial = gnark_witness("blake3");
     let pk = proving_key("blake3");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -98,7 +108,9 @@ fn sha256_hash() {
     let partial = gnark_witness("sha256_hash");
     let pk = proving_key("sha256_hash");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -108,7 +120,9 @@ fn keccak_f1600() {
     let partial = gnark_witness("keccak_f1600");
     let pk = proving_key("keccak_f1600");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -119,7 +133,9 @@ fn aes128encrypt() {
     let partial = gnark_witness("aes128encrypt");
     let pk = proving_key("aes128encrypt");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -130,7 +146,9 @@ fn memory() {
     let partial = gnark_witness("memory");
     let pk = proving_key("memory");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -143,7 +161,9 @@ fn multiscalar_multiplication() {
     let partial = gnark_witness("multiscalar_multiplication");
     let pk = proving_key("multiscalar_multiplication");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -155,7 +175,9 @@ fn recursive_aggregation() {
     let partial = gnark_witness("recursive_aggregation");
     let pk = proving_key("recursive_aggregation");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -167,7 +189,9 @@ fn ecdsa_secp256r1() {
     let partial = gnark_witness("ecdsa_secp256r1");
     let pk = proving_key("ecdsa_secp256r1");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }
 
@@ -178,6 +202,8 @@ fn ecdsa_secp256k1() {
     let partial = gnark_witness("ecdsa_secp256k1");
     let pk = proving_key("ecdsa_secp256k1");
 
-    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys)).expect("solve");
+    let full = solve(&r1cs, &partial, Some(&pk.commitment_keys))
+        .expect("solve")
+        .witness;
     verify_witness(&r1cs, full.clone()).expect("Constraints satisfied");
 }

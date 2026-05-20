@@ -10,6 +10,8 @@
 use ark_bn254::Fr;
 use ark_ff::{PrimeField, Zero};
 
+use crate::solver::InstrOutput;
+
 use super::cursor::Cursor;
 use super::error::SolveError;
 use super::state::Solver;
@@ -30,6 +32,7 @@ mod glv_lattice;
 mod grumpkin_decompose;
 mod grumpkin_split;
 mod inv_zero;
+mod lookup;
 mod n_bits;
 mod partition;
 mod poly_mv;
@@ -40,16 +43,17 @@ mod sw_half_gcd;
 mod sw_half_gcd_eisenstein;
 mod sw_scalar_mul;
 mod to_bytes;
+pub(super) use lookup::solve_lookup;
 
-pub(super) const HINT_HEADER_LEN: usize = 6;
+const HINT_HEADER_LEN: usize = 6;
 /// Entry point for a `Blueprint::GenericHint` instruction.
-pub(super) fn solve_hint(
+pub(super) fn solve_generic_hint(
     solver: &Solver<'_>,
     cursor: &mut Cursor<'_>,
-) -> Result<Vec<(u32, Fr)>, SolveError> {
+) -> Result<InstrOutput, SolveError> {
     let _total = cursor.read_u32()?;
     let hint_id = cursor.read_u32()?;
-    match hint_id {
+    let solved_wires = match hint_id {
         HID_INV_ZERO => inv_zero::solve(solver, cursor).map(|p| vec![p]),
         HID_DECOMPOSE => decompose::solve(solver, cursor),
         HID_RANDOMIZE => randomize::solve(solver, cursor),
@@ -75,7 +79,8 @@ pub(super) fn solve_hint(
         HID_N_BITS => n_bits::solve(solver, cursor),
         HID_POLY_MV => poly_mv::solve(solver, cursor),
         _ => Err(HintError::UnknownHint { hint_id }.into()),
-    }
+    }?;
+    Ok(InstrOutput::Hint(solved_wires))
 }
 
 /// Read a length-prefixed linear expression and evaluate it against the

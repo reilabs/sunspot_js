@@ -6,21 +6,17 @@
 //! instructions with `nb_entries` choosing the live prefix. Outputs go to consecutive
 //! wires starting at `wire_offset`.
 
-use ark_bn254::Fr;
-
-use super::{SolveError, cursor::Cursor, state::Solver};
-
-use super::hints::error::HintError;
-use super::hints::{fr_to_u64, read_input};
+use super::{error::HintError, fr_to_u64, read_input};
+use crate::solver::{Cursor, InstrOutput, SolveError, Solver};
 
 const NAME: &str = "LookupHint";
 
-pub(super) fn solve_lookup(
+pub(in crate::solver) fn solve_lookup(
     solver: &Solver<'_>,
     cursor: &mut Cursor<'_>,
     entries_calldata: &[u32],
     wire_offset: u32,
-) -> Result<Vec<(u32, Fr)>, SolveError> {
+) -> Result<InstrOutput, SolveError> {
     let _total = cursor.read_u32()?;
     let nb_entries = cursor.read_u32()? as usize;
     let nb_inputs = cursor.read_u32()? as usize;
@@ -68,5 +64,5 @@ pub(super) fn solve_lookup(
         out.push((wire_offset + i as u32, value));
     }
 
-    Ok(out)
+    Ok(InstrOutput::Hint(out))
 }

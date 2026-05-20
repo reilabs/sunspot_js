@@ -1,23 +1,23 @@
 use ark_bn254::Fr;
 use ark_ff::{Field, Zero};
 
-use super::cursor::Cursor;
-use super::error::SolveError;
-use super::linear_expr::{self, PartialEval};
-use super::state::Solver;
+use crate::solver::InstrOutput;
+
+use super::{
+    Cursor, SolveError, Solver,
+    linear_expr::{self, PartialEval},
+};
 
 /// Solves one `BlueprintGenericR1C` instruction.
 ///
-/// Pure compute: reads from `solver` but performs no writes. Returns the
-/// `(wire_id, value)` pair to commit if the constraint had one unknown, or
-/// `None` if the constraint was fully solved (verification-only branch).
-/// The caller commits writes after the parallel level finishes — see
-/// [`super::run_solver`].
+/// Returns an optional `(wire_id, value)` pair (if not already solved)
+/// and the row's full `(A·w, B·w, C·w)` evaluations.
 pub(super) fn solve_generic_r1c(
     solver: &Solver<'_>,
     cursor: &mut Cursor<'_>,
     instr_idx: u32,
-) -> Result<Option<(u32, Fr)>, SolveError> {
+    row_idx: u32,
+) -> Result<InstrOutput, SolveError> {
     let _nb_inputs = cursor.read_u32()?;
     let len_a = cursor.read_u32()? as usize;
     let len_b = cursor.read_u32()? as usize;
@@ -43,10 +43,14 @@ pub(super) fn solve_generic_r1c(
         if eval_a.known_sum * eval_b.known_sum != eval_c.known_sum {
             return Err(SolveError::ConstraintUnsatisfied { instr_idx });
         }
-        return Ok(None);
+        return Ok(InstrOutput::R1c {
+            write: None,
+            row_idx,
+            row: (eval_a.known_sum, eval_b.known_sum, eval_c.known_sum),
+        });
     }
 
-    let (w_id, value) = if let Some((coeff, wid)) = eval_a.unknown {
+    let (write, row) = if let Some((coeff, wid)) = eval_a.unknown {
         //  value = (C/B − a) / coeff
         let value = solve_via_quotient(
             eval_c.known_sum,
@@ -55,7 +59,8 @@ pub(super) fn solve_generic_r1c(
             coeff,
             instr_idx,
         )?;
-        (wid, value)
+        let a_full = eval_a.known_sum + coeff * value;
+        ((wid, value), (a_full, eval_b.known_sum, eval_c.known_sum))
     } else if let Some((coeff, wid)) = eval_b.unknown {
         //  value = (C/A − b) / coeff
         let value = solve_via_quotient(
@@ -65,7 +70,8 @@ pub(super) fn solve_generic_r1c(
             coeff,
             instr_idx,
         )?;
-        (wid, value)
+        let b_full = eval_b.known_sum + coeff * value;
+        ((wid, value), (eval_a.known_sum, b_full, eval_c.known_sum))
     } else {
         let (coeff, wid) = eval_c.unknown.unwrap();
         // value = (A·B − c) / coeff
@@ -73,10 +79,15 @@ pub(super) fn solve_generic_r1c(
             .inverse()
             .ok_or(SolveError::NoSolution { instr_idx })?;
         let value = (eval_a.known_sum * eval_b.known_sum - eval_c.known_sum) * coeff_inv;
-        (wid, value)
+        let c_full = eval_c.known_sum + coeff * value;
+        ((wid, value), (eval_a.known_sum, eval_b.known_sum, c_full))
     };
 
-    Ok(Some((w_id, value)))
+    Ok(InstrOutput::R1c {
+        write: Some(write),
+        row_idx,
+        row,
+    })
 }
 
 /// Helper for the A- and B-side cases: solves `partial + coeff·x = num/denom`

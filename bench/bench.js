@@ -20,6 +20,11 @@ const BENCHES = [
     needs: ["ccs", "json", "gz", "pk"],
     call: (a, iters) => sw.bench_solve(a.ccs, a.json, a.gz, a.pk, iters),
   },
+  {
+    name: "prove",
+    needs: ["ccs", "json", "gz", "pk"],
+    call: (a, iters) => sw.bench_prove(a.ccs, a.json, a.gz, a.pk, iters),
+  },
 ];
 
 async function fetchBytes(path) {

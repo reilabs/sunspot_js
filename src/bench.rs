@@ -12,8 +12,9 @@ use std::hint::black_box;
 use wasm_bindgen::prelude::*;
 
 use crate::pedersen_commitments::fold;
+use crate::prover::prove;
 use crate::solver::solve;
-use crate::types;
+use crate::types::*;
 
 fn err(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
@@ -102,17 +103,17 @@ fn run<R>(iterations: u32, mut body: impl FnMut() -> R) -> BenchResult {
 #[wasm_bindgen]
 pub fn bench_parse_r1cs(bytes: &[u8], iterations: u32) -> Result<BenchResult, JsError> {
     // Validate inputs once before entering the timed loop.
-    types::R1CS::from_bytes(bytes).map_err(err)?;
+    R1CS::from_bytes(bytes).map_err(err)?;
     Ok(run(iterations, || {
-        types::R1CS::from_bytes(black_box(bytes)).unwrap()
+        R1CS::from_bytes(black_box(bytes)).unwrap()
     }))
 }
 
 #[wasm_bindgen]
 pub fn bench_parse_proving_key(bytes: &[u8], iterations: u32) -> Result<BenchResult, JsError> {
-    types::ProvingKey::from_bytes(bytes).map_err(err)?;
+    ProvingKey::from_bytes(bytes).map_err(err)?;
     Ok(run(iterations, || {
-        types::ProvingKey::from_bytes(black_box(bytes)).unwrap()
+        ProvingKey::from_bytes(black_box(bytes)).unwrap()
     }))
 }
 
@@ -122,9 +123,9 @@ pub fn bench_parse_gnark_witness(
     witness_stack: &[u8],
     iterations: u32,
 ) -> Result<BenchResult, JsError> {
-    types::GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
     Ok(run(iterations, || {
-        types::GnarkWitness::from_bytes(black_box(acir_json), black_box(witness_stack)).unwrap()
+        GnarkWitness::from_bytes(black_box(acir_json), black_box(witness_stack)).unwrap()
     }))
 }
 
@@ -142,11 +143,11 @@ pub fn bench_solve(
     pk_bytes: Option<Vec<u8>>,
     iterations: u32,
 ) -> Result<BenchResult, JsError> {
-    let r1cs = types::R1CS::from_bytes(ccs_bytes).map_err(err)?;
-    let witness = types::GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    let r1cs = R1CS::from_bytes(ccs_bytes).map_err(err)?;
+    let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
     let pk = pk_bytes
         .as_deref()
-        .map(types::ProvingKey::from_bytes)
+        .map(ProvingKey::from_bytes)
         .transpose()
         .map_err(err)?;
     let commitment_keys = pk.as_ref().map(|p| p.commitment_keys.as_slice());
@@ -161,6 +162,37 @@ pub fn bench_solve(
     }))
 }
 
+/// Bench the full proof pipeline: parse-once, then solve+prove on each
+/// iteration. Mirrors what the `wasm::prove` shim does under the hood.
+#[wasm_bindgen]
+pub fn bench_prove(
+    ccs_bytes: &[u8],
+    acir_json: &[u8],
+    witness_stack: &[u8],
+    pk_bytes: &[u8],
+    iterations: u32,
+) -> Result<BenchResult, JsError> {
+    let r1cs = R1CS::from_bytes(ccs_bytes).map_err(err)?;
+    let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    let pk = ProvingKey::from_bytes(pk_bytes).map_err(err)?;
+    let commitment_keys = if pk.commitment_keys.is_empty() {
+        None
+    } else {
+        Some(pk.commitment_keys.as_slice())
+    };
+    let solved = solve(&r1cs, &witness, commitment_keys).map_err(err)?;
+    prove(&r1cs, solved, &pk).map_err(err)?;
+    Ok(run(iterations, || {
+        let solved = solve(
+            black_box(&r1cs),
+            black_box(&witness),
+            black_box(commitment_keys),
+        )
+        .unwrap();
+        prove(black_box(&r1cs), solved, black_box(&pk)).unwrap()
+    }))
+}
+
 /// Bench `PedersenProvingKey::commit` summed across every commitment key in
 /// the PK. Values are deterministic synthetic scalars (`Fr::from(i + 1)`).
 /// Returns `None` for algebraic-only circuits (no commitment keys).
@@ -169,7 +201,7 @@ pub fn bench_pedersen_commit(
     pk_bytes: &[u8],
     iterations: u32,
 ) -> Result<Option<BenchResult>, JsError> {
-    let pk = types::ProvingKey::from_bytes(pk_bytes).map_err(err)?;
+    let pk = ProvingKey::from_bytes(pk_bytes).map_err(err)?;
     if pk.commitment_keys.is_empty() {
         return Ok(None);
     }
@@ -190,7 +222,7 @@ pub fn bench_pedersen_prove_knowledge(
     pk_bytes: &[u8],
     iterations: u32,
 ) -> Result<Option<BenchResult>, JsError> {
-    let pk = types::ProvingKey::from_bytes(pk_bytes).map_err(err)?;
+    let pk = ProvingKey::from_bytes(pk_bytes).map_err(err)?;
     if pk.commitment_keys.is_empty() {
         return Ok(None);
     }
@@ -218,7 +250,7 @@ pub fn bench_fold(num_points: u32, iterations: u32) -> Result<BenchResult, JsErr
     Ok(run(iterations, || fold(black_box(&points), coeff)))
 }
 
-fn pedersen_inputs(pk: &types::ProvingKey) -> Vec<(&types::PedersenProvingKey, Vec<Fr>)> {
+fn pedersen_inputs(pk: &ProvingKey) -> Vec<(&PedersenProvingKey, Vec<Fr>)> {
     pk.commitment_keys
         .iter()
         .map(|key| {

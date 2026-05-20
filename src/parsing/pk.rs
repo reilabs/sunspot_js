@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use ark_bn254::{Fq, Fq2, Fr, G1Affine, G2Affine};
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField, Zero};
 use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::{PedersenProvingKey, ProvingKey, types::Domain};
@@ -203,6 +203,10 @@ fn g1_from_uncompressed(buf: &[u8]) -> Result<G1Affine, ParseError> {
     // mask. Read straight through.
     let x = read_fq(&buf[..FIELD_BYTES]);
     let y = read_fq(&buf[FIELD_BYTES..2 * FIELD_BYTES]);
+    // gnark's "raw" PK encoder emits identity entries as 64 zero bytes
+    if x.is_zero() && y.is_zero() {
+        return Ok(G1Affine::identity());
+    }
     Ok(G1Affine::new_unchecked(x, y))
 }
 
@@ -223,6 +227,10 @@ fn g2_from_uncompressed(buf: &[u8]) -> Result<G2Affine, ParseError> {
     let x_c0 = read_fq(&buf[FIELD_BYTES..2 * FIELD_BYTES]);
     let y_c1 = read_fq(&buf[2 * FIELD_BYTES..3 * FIELD_BYTES]);
     let y_c0 = read_fq(&buf[3 * FIELD_BYTES..4 * FIELD_BYTES]);
+    // Gnark encodes identity as all zeros
+    if x_c0.is_zero() && x_c1.is_zero() && y_c0.is_zero() && y_c1.is_zero() {
+        return Ok(G2Affine::identity());
+    }
     Ok(G2Affine::new_unchecked(
         Fq2::new(x_c0, x_c1),
         Fq2::new(y_c0, y_c1),

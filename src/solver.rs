@@ -96,7 +96,9 @@ fn run_instruction(solver: &Solver<'_>, instr_idx: u32) -> Result<InstrOutput, S
         Blueprint::LookupHint {
             entries_calldata, ..
         } => solve_lookup(solver, &mut cursor, entries_calldata, instr.wire_offset),
-        Blueprint::BatchInverse(_) => Err(SolveError::BlueprintNotImplemented("batch inverse")),
+        Blueprint::BatchInverse(_) => Err(SolveError::BlueprintNotImplemented(
+            "Inverse blueprint called, but is not supported via sunspot",
+        )),
         _ => Err(SolveError::BlueprintNotImplemented(
             "Plonkish Constraints not supported",
         )),

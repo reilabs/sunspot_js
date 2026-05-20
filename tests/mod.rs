@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use sunspot_wasm::{GnarkWitness, ProvingKey, R1CS};
 
 mod parsing;
+mod proving;
 mod solving;
 
 pub fn r1cs(name: &str) -> R1CS {

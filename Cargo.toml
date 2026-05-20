@@ -16,9 +16,11 @@ ark-bn254 = { version = "0.5", default-features = false, features = ["curve"] }
 ark-ec = { version = "0.5", default-features = false }
 ark-ff = { version = "0.5", default-features = false }
 ark-grumpkin = { version = "0.5", default-features = false }
+ark-poly = { version = "0.5", default-features = false }
 ark-secp256k1 = { version = "0.5", default-features = false }
 ark-secp256r1 = { version = "0.5", default-features = false }
 ark-serialize = { version = "0.5", default-features = false }
+ark-std = { version = "0.5", default-features = false }
 
 base64 = "0.22"
 byteorder = "1.5"
@@ -35,3 +37,7 @@ web-sys = { version = "0.3", optional = true, features = ["Performance", "Window
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen-rayon = "1.2"
+
+#Gated to non-wasm targets so wasm builds don't drag in the Solana toolchain.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+gnark-verifier-solana = { git = "https://github.com/reilabs/sunspot.git", rev = "3a260eb" }

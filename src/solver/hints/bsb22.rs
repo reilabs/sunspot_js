@@ -23,6 +23,7 @@ use super::super::state::Solver;
 use super::error::HintError;
 use super::{fr_to_u64, read_input};
 use crate::pedersen_commitments::{COMMITMENT_DST, FR_BYTES, hash_to_fr};
+use crate::solver::InstrOutput;
 use crate::types::CommitmentInfo;
 
 const NAME: &str = "Bsb22CommitmentComputePlaceholder";
@@ -30,7 +31,10 @@ const NAME: &str = "Bsb22CommitmentComputePlaceholder";
 /// gnark G1Affine uncompressed marshal length.
 const G1_AFFINE_UNCOMPRESSED_BYTES: usize = 64;
 
-pub(super) fn solve(solver: &Solver<'_>, cursor: &mut Cursor<'_>) -> Result<(u32, Fr), SolveError> {
+pub(super) fn solve(
+    solver: &Solver<'_>,
+    cursor: &mut Cursor<'_>,
+) -> Result<InstrOutput, SolveError> {
     let nb_inputs = cursor.read_u32()? as usize;
     if nb_inputs < 1 {
         return Err(HintError::HintInputShape {
@@ -118,7 +122,12 @@ pub(super) fn solve(solver: &Solver<'_>, cursor: &mut Cursor<'_>) -> Result<(u32
             source,
         })?;
 
-    Ok((start, challenge))
+    Ok(InstrOutput::Bsb22 {
+        write: (start, challenge),
+        commitment_idx,
+        point: commitment_point,
+        committed_values: committed,
+    })
 }
 
 /// gnark-crypto BN254 `G1Affine.Marshal()` — uncompressed, 64 bytes:

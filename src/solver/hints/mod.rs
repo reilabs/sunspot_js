@@ -53,12 +53,15 @@ pub(super) fn solve_generic_hint(
 ) -> Result<InstrOutput, SolveError> {
     let _total = cursor.read_u32()?;
     let hint_id = cursor.read_u32()?;
+    // BSB22 returns the dedicated `Bsb22` variant directly
+    if hint_id == HID_BSB22 {
+        return bsb22::solve(solver, cursor);
+    }
     let solved_wires = match hint_id {
         HID_INV_ZERO => inv_zero::solve(solver, cursor).map(|p| vec![p]),
         HID_DECOMPOSE => decompose::solve(solver, cursor),
         HID_RANDOMIZE => randomize::solve(solver, cursor),
         HID_COUNT => count::solve(solver, cursor),
-        HID_BSB22 => bsb22::solve(solver, cursor).map(|p| vec![p]),
         HID_XOR => bitwise::solve_xor(solver, cursor).map(|p| vec![p]),
         HID_AND => bitwise::solve_and(solver, cursor).map(|p| vec![p]),
         HID_OR => bitwise::solve_or(solver, cursor).map(|p| vec![p]),

@@ -16,6 +16,11 @@ const BENCHES = [
     call: (a, iters) => sw.bench_parse_r1cs(a.ccs, iters),
   },
   {
+    name: "parse_proving_key",
+    needs: ["pk"],
+    call: (a, iters) => sw.bench_parse_proving_key(a.pk, iters),
+  },
+  {
     name: "solve",
     needs: ["ccs", "json", "gz", "pk"],
     call: (a, iters) => sw.bench_solve(a.ccs, a.json, a.gz, a.pk, iters),

@@ -100,9 +100,9 @@ async function main() {
       out: { type: "string", default: "bench-results.json" },
       projects: {
         type: "string",
-        default: "sum_a_b,polynomial,poseidon2",
+        default: "keccak256,sha256_hash",
       },
-      iters: { type: "string", default: "20" },
+      iters: { type: "string", default: "1" },
       foldN: { type: "string", default: "1024" },
       root: { type: "string", default: "." },
       label: { type: "string", default: "" },

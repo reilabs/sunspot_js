@@ -12,15 +12,16 @@ bench = ["dep:web-sys"]
 [dependencies]
 acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.18", features = ["bn254"] }
 
+
 ark-bn254 = { version = "0.5", default-features = false, features = ["curve"] }
-ark-ec = { version = "0.5", default-features = false }
-ark-ff = { version = "0.5", default-features = false }
+ark-ec = { version = "0.5", default-features = false, features = ["parallel"] }
+ark-ff = { version = "0.5", default-features = false, features = ["parallel"] }
 ark-grumpkin = { version = "0.5", default-features = false }
-ark-poly = { version = "0.5", default-features = false }
+ark-poly = { version = "0.5", default-features = false, features = ["parallel"] }
 ark-secp256k1 = { version = "0.5", default-features = false }
 ark-secp256r1 = { version = "0.5", default-features = false }
 ark-serialize = { version = "0.5", default-features = false }
-ark-std = { version = "0.5", default-features = false }
+ark-std = { version = "0.5", default-features = false, features = ["parallel"] }
 
 base64 = "0.22"
 byteorder = "1.5"
@@ -41,3 +42,19 @@ wasm-bindgen-rayon = "1.2"
 #Gated to non-wasm targets so wasm builds don't drag in the Solana toolchain.
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 gnark-verifier-solana = { git = "https://github.com/reilabs/sunspot.git", rev = "3a260eb" }
+
+# Release profile tuned for in-browser proving
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    "-O4",
+    "--enable-bulk-memory",
+    "--enable-mutable-globals",
+    "--enable-threads",
+    "--enable-simd",
+]

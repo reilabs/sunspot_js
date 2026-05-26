@@ -5,16 +5,23 @@
 //! wasm-pack build --release --target web --features bench
 //! ```
 
-use ark_bn254::{Fr, G1Affine, G1Projective};
+use ark_bn254::{Fr, G1Affine, G1Projective, G2Projective};
 use ark_ec::{AffineRepr, CurveGroup};
-use ark_ff::{One, Zero};
+use ark_ff::{One, PrimeField, Zero};
 use std::hint::black_box;
 use wasm_bindgen::prelude::*;
 
 use crate::pedersen_commitments::fold;
-use crate::prover::prove;
+use crate::prover::{prove, prove_with_timings};
 use crate::solver::solve;
 use crate::types::*;
+
+/// Route Rust panics to `console.error` so the bench harness can see real
+/// messages instead of an opaque `unreachable` trap.
+#[wasm_bindgen(start)]
+pub fn install_panic_hook() {
+    console_error_panic_hook::set_once();
+}
 
 fn err(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
@@ -191,6 +198,93 @@ pub fn bench_prove(
         .unwrap();
         prove(black_box(&r1cs), solved, black_box(&pk)).unwrap()
     }))
+}
+
+/// Mean per-stage prove timings (ms), surfaced to JS as plain getters.
+#[wasm_bindgen]
+pub struct ProveStagesResult {
+    iterations: u32,
+    setup_ms: f64,
+    compute_h_ms: f64,
+    bsb22_pok_ms: f64,
+    prove_ar_bs_bs1_ms: f64,
+    prove_krs_ms: f64,
+    total_sequential_ms: f64,
+}
+
+#[wasm_bindgen]
+impl ProveStagesResult {
+    #[wasm_bindgen(getter)]
+    pub fn iterations(&self) -> u32 {
+        self.iterations
+    }
+    #[wasm_bindgen(getter)]
+    pub fn setup_ms(&self) -> f64 {
+        self.setup_ms
+    }
+    #[wasm_bindgen(getter)]
+    pub fn compute_h_ms(&self) -> f64 {
+        self.compute_h_ms
+    }
+    #[wasm_bindgen(getter)]
+    pub fn bsb22_pok_ms(&self) -> f64 {
+        self.bsb22_pok_ms
+    }
+    #[wasm_bindgen(getter)]
+    pub fn prove_ar_bs_bs1_ms(&self) -> f64 {
+        self.prove_ar_bs_bs1_ms
+    }
+    #[wasm_bindgen(getter)]
+    pub fn prove_krs_ms(&self) -> f64 {
+        self.prove_krs_ms
+    }
+    #[wasm_bindgen(getter)]
+    pub fn total_sequential_ms(&self) -> f64 {
+        self.total_sequential_ms
+    }
+}
+
+/// Bench-only: run `prove` sequentially with per-stage timers and average
+/// across `iterations`. Useful for localizing which stage dominates.
+#[wasm_bindgen]
+pub fn bench_prove_stages(
+    ccs_bytes: &[u8],
+    acir_json: &[u8],
+    witness_stack: &[u8],
+    pk_bytes: &[u8],
+    iterations: u32,
+) -> Result<ProveStagesResult, JsError> {
+    assert!(iterations > 0, "iterations must be > 0");
+    let r1cs = R1CS::from_bytes(ccs_bytes).map_err(err)?;
+    let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    let pk = ProvingKey::from_bytes(pk_bytes).map_err(err)?;
+    let commitment_keys = if pk.commitment_keys.is_empty() {
+        None
+    } else {
+        Some(pk.commitment_keys.as_slice())
+    };
+
+    let (mut setup, mut h, mut pok, mut ar_bs, mut krs) = (0.0, 0.0, 0.0, 0.0, 0.0);
+    for _ in 0..iterations {
+        let solved = solve(&r1cs, &witness, commitment_keys).map_err(err)?;
+        let (_proof, t) = prove_with_timings(&r1cs, solved, &pk).map_err(err)?;
+        setup += t.setup_ms;
+        h += t.compute_h_ms;
+        pok += t.bsb22_pok_ms;
+        ar_bs += t.prove_ar_bs_bs1_ms;
+        krs += t.prove_krs_ms;
+    }
+    let n = iterations as f64;
+    let (setup, h, pok, ar_bs, krs) = (setup / n, h / n, pok / n, ar_bs / n, krs / n);
+    Ok(ProveStagesResult {
+        iterations,
+        setup_ms: setup,
+        compute_h_ms: h,
+        bsb22_pok_ms: pok,
+        prove_ar_bs_bs1_ms: ar_bs,
+        prove_krs_ms: krs,
+        total_sequential_ms: setup + h + pok + ar_bs + krs,
+    })
 }
 
 /// Bench `PedersenProvingKey::commit` summed across every commitment key in

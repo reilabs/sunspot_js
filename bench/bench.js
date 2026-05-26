@@ -30,7 +30,27 @@ const BENCHES = [
     needs: ["ccs", "json", "gz", "pk"],
     call: (a, iters) => sw.bench_prove(a.ccs, a.json, a.gz, a.pk, iters),
   },
+  {
+    name: "prove_stages",
+    needs: ["ccs", "json", "gz", "pk"],
+    call: (a, iters) =>
+      sw.bench_prove_stages(a.ccs, a.json, a.gz, a.pk, iters),
+    serialize: (r) => ({
+      iterations: r.iterations,
+      setup_ms: r.setup_ms,
+      compute_h_ms: r.compute_h_ms,
+      bsb22_pok_ms: r.bsb22_pok_ms,
+      prove_ar_bs_bs1_ms: r.prove_ar_bs_bs1_ms,
+      prove_krs_ms: r.prove_krs_ms,
+      total_sequential_ms: r.total_sequential_ms,
+    }),
+  }
 ];
+
+// Tuned so each sample takes ~tens of µs (median Fr mul ≈ a few hundred
+// nanoseconds on wasm). Adjust if `min_ms` falls below ~0.05ms.
+const MUL_PAIRS = 16384;
+const nsPerMul = (r) => (r.median_ms * 1e6) / MUL_PAIRS;
 
 async function fetchBytes(path) {
   const r = await fetch(path);
@@ -77,7 +97,8 @@ async function runProject({ project, iters, foldN }) {
       if (result == null) {
         benches.push({ name: b.name, skipped: true });
       } else {
-        benches.push({ name: b.name, ...serialize(result) });
+        const ser = b.serialize ?? serialize;
+        benches.push({ name: b.name, ...ser(result) });
       }
     } catch (e) {
       benches.push({ name: b.name, error: e.message ?? String(e) });

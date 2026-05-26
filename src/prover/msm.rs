@@ -13,8 +13,8 @@ pub(super) fn prove_ar_bs_bs1(
     g1_a: &[G1Affine],
     g1_b: &[G1Affine],
     g2_b: &[G2Affine],
-    infinity_a: &[bool],
-    infinity_b: &[bool],
+    idx_a: &[u32],
+    idx_b: &[u32],
     wire_values: &[Fr],
     g1_alpha: G1Affine,
     g1_beta: G1Affine,
@@ -25,25 +25,11 @@ pub(super) fn prove_ar_bs_bs1(
     s_scalar: Fr,
 ) -> Result<(G1Affine, G2Affine, G1Projective), ProveError> {
     // The PK ships `g1_a`/`g1_b`/`g2_b` with all-zero points filtered out;
-    // gather the matching wire scalars by skipping infinity flags.
-    let (wire_values_a, wire_values_b) = rayon::join(
-        || {
-            wire_values
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !infinity_a[*i])
-                .map(|(_, v)| *v)
-                .collect::<Vec<Fr>>()
-        },
-        || {
-            wire_values
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !infinity_b[*i])
-                .map(|(_, v)| *v)
-                .collect::<Vec<Fr>>()
-        },
-    );
+    // `idx_a`/`idx_b` are the kept wire positions, precomputed at PK-parse
+    // time so we just do contiguous gather here instead of re-scanning the
+    // infinity bitmap on every proof.
+    let (wire_values_a, wire_values_b) =
+        rayon::join(|| gather(wire_values, idx_a), || gather(wire_values, idx_b));
 
     let ar = {
         let msm = G1Projective::msm(g1_a, &wire_values_a).map_err(ProveError::msm("g1_a"))?;
@@ -134,6 +120,15 @@ pub(super) fn prove_krs(
     result += r_bs1;
 
     Ok(result.into_affine())
+}
+
+/// Gather `src[i as usize]` for each `i in idx`, into a fresh `Vec<Fr>`.
+fn gather(src: &[Fr], idx: &[u32]) -> Vec<Fr> {
+    let mut out = Vec::with_capacity(idx.len());
+    for &i in idx {
+        out.push(src[i as usize]);
+    }
+    out
 }
 
 /// Drop elements at the sorted absolute indices `sorted_indices` from

@@ -3,8 +3,9 @@
 use std::path::Path;
 
 use ark_bn254::{Fq, Fq2, Fr, G1Affine, G2Affine};
-use ark_ff::{PrimeField, Zero};
+use ark_ff::{BigInt, PrimeField, Zero};
 use byteorder::{BigEndian, ReadBytesExt};
+use rayon::prelude::*;
 
 use crate::{PedersenProvingKey, ProvingKey, types::Domain};
 
@@ -48,6 +49,8 @@ impl ProvingKey {
         // `binary.Read` reflects on the slice's pre-allocated length.
         let infinity_a = read_bool_vec(&mut r, nb_wires as usize)?;
         let infinity_b = read_bool_vec(&mut r, nb_wires as usize)?;
+        let idx_a = kept_indices(&infinity_a);
+        let idx_b = kept_indices(&infinity_b);
 
         let nb_commitments = r.read_u32::<BigEndian>()?;
         let mut commitment_keys = Vec::with_capacity(nb_commitments as usize);
@@ -79,18 +82,31 @@ impl ProvingKey {
             nb_infinity_b,
             infinity_a,
             infinity_b,
+            idx_a,
+            idx_b,
             commitment_keys,
         })
     }
 }
 
+fn kept_indices(infinity: &[bool]) -> Vec<u32> {
+    let kept = infinity.iter().filter(|b| !**b).count();
+    let mut out = Vec::with_capacity(kept);
+    for (i, &inf) in infinity.iter().enumerate() {
+        if !inf {
+            out.push(i as u32);
+        }
+    }
+    out
+}
+
 fn read_domain(r: &mut &[u8]) -> Result<Domain, ParseError> {
     let cardinality = r.read_u64::<BigEndian>()?;
-    let cardinality_inv = read_fr(r)?;
-    let generator = read_fr(r)?;
-    let generator_inv = read_fr(r)?;
-    let fr_multiplicative_gen = read_fr(r)?;
-    let fr_multiplicative_gen_inv = read_fr(r)?;
+    let cardinality_inv = read_fr(take(r, FIELD_BYTES)?);
+    let generator = read_fr(take(r, FIELD_BYTES)?);
+    let generator_inv = read_fr(take(r, FIELD_BYTES)?);
+    let fr_multiplicative_gen = read_fr(take(r, FIELD_BYTES)?);
+    let fr_multiplicative_gen_inv = read_fr(take(r, FIELD_BYTES)?);
     let with_precompute = r.read_u8()? != 0;
     Ok(Domain {
         cardinality,
@@ -110,13 +126,22 @@ fn read_pedersen_pk(r: &mut &[u8]) -> Result<PedersenProvingKey, ParseError> {
     })
 }
 
-fn read_fr(r: &mut &[u8]) -> Result<Fr, ParseError> {
-    let buf = take(r, FIELD_BYTES)?;
-    Ok(Fr::from_be_bytes_mod_order(buf))
+fn read_fr(buf: &[u8]) -> Fr {
+    // 4 BE u64 limbs, MSB first in file → little-endian limb order [l0,l1,l2,l3]
+    let l3 = u64::from_be_bytes(buf[0..8].try_into().unwrap());
+    let l2 = u64::from_be_bytes(buf[8..16].try_into().unwrap());
+    let l1 = u64::from_be_bytes(buf[16..24].try_into().unwrap());
+    let l0 = u64::from_be_bytes(buf[24..32].try_into().unwrap());
+    Fr::from_bigint(BigInt::new([l0, l1, l2, l3])).expect("canonical")
 }
 
 fn read_fq(buf: &[u8]) -> Fq {
-    Fq::from_be_bytes_mod_order(buf)
+    // 4 BE u64 limbs, MSB first in file → little-endian limb order [l0,l1,l2,l3]
+    let l3 = u64::from_be_bytes(buf[0..8].try_into().unwrap());
+    let l2 = u64::from_be_bytes(buf[8..16].try_into().unwrap());
+    let l1 = u64::from_be_bytes(buf[16..24].try_into().unwrap());
+    let l0 = u64::from_be_bytes(buf[24..32].try_into().unwrap());
+    Fq::from_bigint(BigInt::new([l0, l1, l2, l3])).expect("canonical")
 }
 
 fn read_g1(r: &mut &[u8]) -> Result<G1Affine, ParseError> {
@@ -131,20 +156,18 @@ fn read_g2(r: &mut &[u8]) -> Result<G2Affine, ParseError> {
 
 fn read_g1_vec(r: &mut &[u8]) -> Result<Vec<G1Affine>, ParseError> {
     let len = r.read_u32::<BigEndian>()? as usize;
-    let mut out = Vec::with_capacity(len);
-    for _ in 0..len {
-        out.push(read_g1(r)?);
-    }
-    Ok(out)
+    let buf = take(r, len * G1_AFFINE_BYTES)?;
+    buf.par_chunks_exact(G1_AFFINE_BYTES)
+        .map(g1_from_uncompressed)
+        .collect()
 }
 
 fn read_g2_vec(r: &mut &[u8]) -> Result<Vec<G2Affine>, ParseError> {
     let len = r.read_u32::<BigEndian>()? as usize;
-    let mut out = Vec::with_capacity(len);
-    for _ in 0..len {
-        out.push(read_g2(r)?);
-    }
-    Ok(out)
+    let buf = take(r, len * G2_AFFINE_BYTES)?;
+    buf.par_chunks_exact(G2_AFFINE_BYTES)
+        .map(g2_from_uncompressed)
+        .collect()
 }
 
 /// Apply the inverse of a `log₂(domain_size)`-bit bit-reversal permutation,
@@ -207,7 +230,14 @@ fn g1_from_uncompressed(buf: &[u8]) -> Result<G1Affine, ParseError> {
     if x.is_zero() && y.is_zero() {
         return Ok(G1Affine::identity());
     }
-    Ok(G1Affine::new_unchecked(x, y))
+    // BN254 G1 has cofactor 1, so on-curve ⟹ in the prime-order subgroup;
+    // `Affine::new` would also run `is_in_correct_subgroup_assuming_on_curve`
+    // (a scalar mul) which we skip.
+    let p = G1Affine::new_unchecked(x, y);
+    if !p.is_on_curve() {
+        return Err(ParseError::ProvingKey("G1 point not on curve".into()));
+    }
+    Ok(p)
 }
 
 fn g2_from_uncompressed(buf: &[u8]) -> Result<G2Affine, ParseError> {
@@ -231,10 +261,7 @@ fn g2_from_uncompressed(buf: &[u8]) -> Result<G2Affine, ParseError> {
     if x_c0.is_zero() && x_c1.is_zero() && y_c0.is_zero() && y_c1.is_zero() {
         return Ok(G2Affine::identity());
     }
-    Ok(G2Affine::new_unchecked(
-        Fq2::new(x_c0, x_c1),
-        Fq2::new(y_c0, y_c1),
-    ))
+    Ok(G2Affine::new(Fq2::new(x_c0, x_c1), Fq2::new(y_c0, y_c1)))
 }
 
 /// Sunspot uses uncompressed bn254 points (`SizeOfG1AffineUncompressed`).

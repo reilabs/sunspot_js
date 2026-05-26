@@ -23,6 +23,8 @@ pub struct ProvingKey {
     pub nb_infinity_b: u64,
     pub infinity_a: Vec<bool>,
     pub infinity_b: Vec<bool>,
+    pub idx_a: Vec<u32>,
+    pub idx_b: Vec<u32>,
 
     pub commitment_keys: Vec<PedersenProvingKey>,
 }

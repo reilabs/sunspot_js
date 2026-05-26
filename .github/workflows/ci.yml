@@ -264,12 +264,16 @@ jobs:
 
       - name: Build PR wasm (--features bench)
         working-directory: pr
+        env:
+          CARGO_UNSTABLE_BUILD_STD: panic_abort,std
         run: wasm-pack build --release --target web --features bench
 
       - name: Build base wasm (--features bench)
         id: base_build
         continue-on-error: true
         working-directory: base
+        env:
+          CARGO_UNSTABLE_BUILD_STD: panic_abort,std
         run: wasm-pack build --release --target web --features bench
 
       - name: Download fixtures

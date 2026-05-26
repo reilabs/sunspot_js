@@ -1,3 +1,5 @@
+use ark_ec::AffineRepr;
+
 use crate::proving_key;
 
 #[test]
@@ -21,5 +23,5 @@ fn sum_a_b() {
 
     // The three top-level G1 points must be well-formed (read_g1 would have
     // errored otherwise); spot-check they aren't all the identity.
-    assert!(!(pk.g1_alpha.infinity && pk.g1_beta.infinity && pk.g1_delta.infinity));
+    assert!(!(pk.g1_alpha.is_zero() && pk.g1_beta.is_zero() && pk.g1_delta.is_zero()));
 }

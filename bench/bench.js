@@ -95,7 +95,7 @@ async function main() {
     }
   } catch (e) {
     window.benchError =
-      "failed to load wasm — did you run `wasm-pack build --release --target web --features bench`?\n\n" +
+      "failed to load wasm — did you run `CARGO_UNSTABLE_BUILD_STD=panic_abort,std wasm-pack build --release --target web --features bench`?\n\n" +
       (e.stack ?? String(e));
     return;
   }

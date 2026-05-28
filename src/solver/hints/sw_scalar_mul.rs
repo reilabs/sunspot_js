@@ -12,7 +12,7 @@
 //!
 //! Outputs: `2 · t1_nb_limbs` Fr witness values — base-field limbs of Qx
 //! followed by limbs of Qy.
-use ark_bn254::Fr;
+use crate::curve::{Fr, G1Config};
 use ark_ec::{
     AffineRepr, CurveGroup,
     short_weierstrass::{Affine, SWCurveConfig},
@@ -63,7 +63,7 @@ pub(super) fn solve(
     } else if base_modulus == SECP256K1_FP {
         scalar_mul::<ark_secp256k1::Config>(px, py, s)
     } else if base_modulus == BN254_FP {
-        scalar_mul::<ark_bn254::g1::Config>(px, py, s)
+        scalar_mul::<G1Config>(px, py, s)
     } else {
         return Err(HintError::UnsupportedCurve {
             hint_name: NAME,

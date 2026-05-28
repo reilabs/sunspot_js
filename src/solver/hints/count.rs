@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{BigInteger, PrimeField};
 
 use super::super::cursor::Cursor;

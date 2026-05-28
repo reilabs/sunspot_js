@@ -13,7 +13,7 @@
 //!   [1..1+k]   k = len(commitment_info[i].public_and_commitment_committed)
 //!   [1+k..]    the private-committed values
 
-use ark_bn254::Fr;
+use crate::curve::{Fq, Fr, G1Affine};
 use ark_ec::AffineRepr;
 use ark_ff::{BigInteger, PrimeField};
 
@@ -23,6 +23,7 @@ use super::super::state::Solver;
 use super::error::HintError;
 use super::{fr_to_u64, read_input};
 use crate::pedersen_commitments::{COMMITMENT_DST, FR_BYTES, hash_to_fr};
+use crate::solver::InstrOutput;
 use crate::types::CommitmentInfo;
 
 const NAME: &str = "Bsb22CommitmentComputePlaceholder";
@@ -30,7 +31,10 @@ const NAME: &str = "Bsb22CommitmentComputePlaceholder";
 /// gnark G1Affine uncompressed marshal length.
 const G1_AFFINE_UNCOMPRESSED_BYTES: usize = 64;
 
-pub(super) fn solve(solver: &Solver<'_>, cursor: &mut Cursor<'_>) -> Result<(u32, Fr), SolveError> {
+pub(super) fn solve(
+    solver: &Solver<'_>,
+    cursor: &mut Cursor<'_>,
+) -> Result<InstrOutput, SolveError> {
     let nb_inputs = cursor.read_u32()? as usize;
     if nb_inputs < 1 {
         return Err(HintError::HintInputShape {
@@ -118,14 +122,19 @@ pub(super) fn solve(solver: &Solver<'_>, cursor: &mut Cursor<'_>) -> Result<(u32
             source,
         })?;
 
-    Ok((start, challenge))
+    Ok(InstrOutput::Bsb22 {
+        write: (start, challenge),
+        commitment_idx,
+        point: commitment_point,
+        committed_values: committed,
+    })
 }
 
 /// gnark-crypto BN254 `G1Affine.Marshal()` — uncompressed, 64 bytes:
 /// `[X big-endian || Y big-endian]`. Infinity (0,0) marshals to all zeros.
 /// The top 2 bits of byte 0 are the metadata mask; for uncompressed they are
 /// zero, so X big-endian works as-is (BN254's modulus fits in 254 bits).
-fn g1_marshal(p: &ark_bn254::G1Affine) -> [u8; G1_AFFINE_UNCOMPRESSED_BYTES] {
+fn g1_marshal(p: &G1Affine) -> [u8; G1_AFFINE_UNCOMPRESSED_BYTES] {
     let mut out = [0u8; G1_AFFINE_UNCOMPRESSED_BYTES];
     if p.is_zero() {
         return out;
@@ -136,7 +145,7 @@ fn g1_marshal(p: &ark_bn254::G1Affine) -> [u8; G1_AFFINE_UNCOMPRESSED_BYTES] {
     out
 }
 
-fn fq_to_be_bytes(x: &ark_bn254::Fq) -> [u8; 32] {
+fn fq_to_be_bytes(x: &Fq) -> [u8; 32] {
     let mut out = [0u8; 32];
     let bytes = x.into_bigint().to_bytes_be();
     // BN254 Fq is 254 bits → fits in 32 bytes; to_bytes_be returns the

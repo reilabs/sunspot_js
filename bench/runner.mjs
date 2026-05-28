@@ -10,88 +10,11 @@
 // The `--pkg <dir>` flag aliases `/pkg/*` to a chosen directory, so the
 // same harness can bench multiple wasm builds without copying files.
 
-import { createServer } from "node:http";
-import { readFile, writeFile, stat } from "node:fs/promises";
-import { extname, resolve } from "node:path";
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { chromium } from "playwright";
-
-const MIME = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".mjs": "application/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".wasm": "application/wasm",
-  ".gz": "application/gzip",
-};
-
-async function fileExists(path) {
-  try {
-    return (await stat(path)).isFile();
-  } catch {
-    return false;
-  }
-}
-
-// Resolves the package.json `"main"` entry for a pkg directory.
-async function resolvePkgMain(pkgDir) {
-  try {
-    const json = JSON.parse(
-      await readFile(resolve(pkgDir, "package.json"), "utf-8"),
-    );
-    return typeof json.main === "string" ? json.main : null;
-  } catch {
-    return null;
-  }
-}
-
-async function startServer({ root, pkg }) {
-  const pkgMain = await resolvePkgMain(pkg);
-  const server = createServer(async (req, res) => {
-    try {
-      const url = new URL(req.url, "http://localhost");
-      let pathname = decodeURIComponent(url.pathname);
-      if (pkgMain && (pathname === "/pkg" || pathname === "/pkg/")) {
-        pathname = "/pkg/" + pkgMain;
-      } else if (pathname.endsWith("/")) {
-        pathname += "index.html";
-      }
-
-      let filePath;
-      if (pathname.startsWith("/pkg/")) {
-        filePath = resolve(pkg, pathname.slice("/pkg/".length));
-      } else {
-        filePath = resolve(root, "." + pathname);
-      }
-      // Block path escapes.
-      const allowed =
-        filePath.startsWith(resolve(root)) || filePath.startsWith(resolve(pkg));
-      if (!allowed || !(await fileExists(filePath))) {
-        res.writeHead(404);
-        res.end("not found");
-        return;
-      }
-
-      const buf = await readFile(filePath);
-      res.writeHead(200, {
-        "Content-Type":
-          MIME[extname(filePath)] ?? "application/octet-stream",
-        "Cache-Control": "no-store",
-        // `bench_*` runs are heavy; let the browser hold the response open.
-        "Content-Length": buf.length,
-        // Cross-origin isolation — required for SharedArrayBuffer.
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "require-corp",
-      });
-      res.end(buf);
-    } catch (e) {
-      res.writeHead(500);
-      res.end(String(e));
-    }
-  });
-  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
-}
+import { startServer } from "./server.mjs";
 
 async function main() {
   const { values } = parseArgs({
@@ -100,9 +23,9 @@ async function main() {
       out: { type: "string", default: "bench-results.json" },
       projects: {
         type: "string",
-        default: "sum_a_b,polynomial,poseidon2",
+        default: "keccak256,sha256_hash",
       },
-      iters: { type: "string", default: "20" },
+      iters: { type: "string", default: "1" },
       foldN: { type: "string", default: "1024" },
       root: { type: "string", default: "." },
       label: { type: "string", default: "" },

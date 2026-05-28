@@ -7,22 +7,25 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-bench = ["dep:web-sys"]
+local-curve = ["dep:bn254-multiplier"]
+bench = ["local-curve", "dep:web-sys", "dep:console_error_panic_hook"]
 
 [dependencies]
 acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.18", features = ["bn254"] }
-
-ark-bn254 = { version = "0.5", default-features = false, features = ["curve"] }
-ark-ec = { version = "0.5", default-features = false }
-ark-ff = { version = "0.5", default-features = false }
-ark-grumpkin = { version = "0.5", default-features = false }
-ark-secp256k1 = { version = "0.5", default-features = false }
-ark-secp256r1 = { version = "0.5", default-features = false }
-ark-serialize = { version = "0.5", default-features = false }
-
+ark-bn254 = { version = "0.6", default-features = false, features = ["curve"] }
+ark-ec = { version = "0.6", default-features = false, features = ["parallel"] }
+ark-ff = { version = "0.6", default-features = false, features = ["parallel"] }
+ark-grumpkin = { version = "0.6", default-features = false }
+ark-poly = { version = "0.6", default-features = false, features = ["parallel"] }
+ark-secp256k1 = { version = "0.6", default-features = false }
+ark-secp256r1 = { version = "0.6", default-features = false }
+ark-serialize = { version = "0.6", default-features = false }
+ark-std = { version = "0.6", default-features = false, features = ["parallel"] }
 base64 = "0.22"
+bn254-multiplier = { git = "https://github.com/reilabs/ProveKit.git", branch = "bn254-opts", optional = true }
 byteorder = "1.5"
 ciborium = "0.2"
+console_error_panic_hook = { version = "0.1", optional = true }
 crypto-bigint = "0.7"
 rand = "0.8"
 rayon = "1.10"
@@ -35,3 +38,46 @@ web-sys = { version = "0.3", optional = true, features = ["Performance", "Window
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen-rayon = "1.2"
+
+# Host-only: keeps the Solana toolchain out of wasm builds.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+gnark-verifier-solana = { git = "https://github.com/reilabs/sunspot.git", rev = "3a260eb" }
+
+# Release profile tuned for in-browser proving
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+# Flags for wasm-pack release build
+# Build with:
+# `CARGO_UNSTABLE_BUILD_STD=panic_abort,std wasm-pack build \
+# --release --target web`
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    "-O4",
+    "--enable-bulk-memory",
+    "--enable-mutable-globals",
+    "--enable-threads",
+    "--enable-simd",
+    "--enable-relaxed-simd",
+
+]
+
+# Profiling build for wasm-pack
+# Build with:
+# `CARGO_UNSTABLE_BUILD_STD=panic_abort,std \
+# CARGO_PROFILE_RELEASE_STRIP=debuginfo \
+# wasm-pack build --profiling --target web -- --features bench`
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = [
+    "-O",
+    "--enable-bulk-memory",
+    "--enable-mutable-globals",
+    "--enable-threads",
+    "--enable-simd",
+    "--enable-relaxed-simd",
+    "-g"
+]
+

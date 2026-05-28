@@ -1,5 +1,7 @@
 use ark_grumpkin::GrumpkinConfig;
 
+use crate::curve::G1Config;
+
 use super::bigint::{SignedWide, Wide, wide_from_lo_limbs};
 use super::eisenstein_integers::eisenstein_gcd;
 
@@ -116,7 +118,7 @@ impl GLVLatticeCurve for GrumpkinConfig {
     const N_SHIFT: usize = 512;
 }
 
-impl GLVLatticeCurve for ark_bn254::g1::Config {
+impl GLVLatticeCurve for G1Config {
     const LAMBDA: Wide =
         wide_from_lo_limbs([0x8b17ea66b99c90dd, 0x5bfc41088d8daaa7, 0xb3c4d79d41a91758]);
     const V1_0: Wide = wide_from_lo_limbs([0x89d3256894d213e3]);

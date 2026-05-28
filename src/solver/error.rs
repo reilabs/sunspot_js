@@ -41,6 +41,12 @@ pub enum SolveError {
     #[error("instruction {instr_idx}: constraint A·B = C not satisfied")]
     ConstraintUnsatisfied { instr_idx: u32 },
 
+    #[error("constraint row {row} out of range (nb_constraints = {total})")]
+    ConstraintRowOutOfRange { row: usize, total: usize },
+
+    #[error("commitment index {idx} out of range ({total} commitments declared)")]
+    CommitmentIndexOutOfRange { idx: usize, total: usize },
+
     #[error("instruction {instr_idx}: no solution for unknown wire")]
     NoSolution { instr_idx: u32 },
 

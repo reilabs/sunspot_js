@@ -33,7 +33,7 @@
 //!   emuOut[8..12]      = |res[1].A0| limbs
 //!   emuOut[12..16]     = |res[1].A1| limbs
 
-use ark_bn254::Fr;
+use crate::curve::{Fr, G1Config};
 use ark_ff::{One, Zero};
 
 use crate::{
@@ -49,7 +49,7 @@ use super::{
 };
 
 // We only support this hint for this specific curve
-type Curve = ark_bn254::g1::Config;
+type Curve = G1Config;
 
 const NAME: &str = "sw_emulated.halfGCDEisenstein";
 

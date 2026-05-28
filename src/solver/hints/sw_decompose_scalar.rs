@@ -22,7 +22,7 @@
 //! Curve dispatch: the precomputed GLV lattice depends on `r` and `λ`. We
 //! recognise secp256k1 by the input λ value and reject everything else.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{One, Zero};
 
 use crate::{

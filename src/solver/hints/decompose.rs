@@ -2,7 +2,7 @@
 //! outputs where N = ceil(varSize / limbSize). Each output is one
 //! `limbSize`-bit limb of `val` (least-significant limb first).
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{BigInteger, PrimeField};
 
 use super::super::cursor::Cursor;

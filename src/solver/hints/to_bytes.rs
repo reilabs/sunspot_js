@@ -1,7 +1,7 @@
 //! `std/math/uints.toBytes`: 2 inputs (nbLimbs, val), nbLimbs outputs. Each
 //! output is the i-th byte of `val` (little-endian: output 0 is the LSB).
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{BigInteger, PrimeField};
 
 use super::super::cursor::Cursor;

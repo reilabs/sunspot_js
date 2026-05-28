@@ -1,4 +1,4 @@
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use crypto_bigint::U2048;
 
 use super::bigint::{
@@ -96,10 +96,10 @@ macro_rules! dispatch_by_modulus {
             type $F = ark_secp256k1::Fr;
             Ok($body)
         } else if __p_val == $crate::solver::hints::emulated_shared::BN254_FP {
-            type $F = ark_bn254::Fq;
+            type $F = crate::curve::Fq;
             Ok($body)
         } else if __p_val == $crate::solver::hints::emulated_shared::BN254_FR {
-            type $F = ark_bn254::Fr;
+            type $F = crate::curve::Fr;
             Ok($body)
         } else {
             Err($crate::solver::hints::error::HintError::UnsupportedCurve {

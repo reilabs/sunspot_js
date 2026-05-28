@@ -2,6 +2,7 @@
 use std::path::Path;
 
 use super::decode_intcomp::IntcompWord;
+use crate::curve::Fr;
 use crate::{
     R1CS,
     types::{
@@ -9,7 +10,6 @@ use crate::{
         PackedInstruction, PlonkCommitment, SectionHeader, SystemType,
     },
 };
-use ark_bn254::Fr;
 use ark_ff::{BigInt, Fp};
 use byteorder::{LittleEndian, ReadBytesExt};
 

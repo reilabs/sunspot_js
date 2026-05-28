@@ -227,7 +227,7 @@ jobs:
     env:
       BENCH_ITERS: '10'
       BENCH_FOLD_N: '4096'
-      BENCH_PROJECTS: 'keccak256'
+      BENCH_PROJECTS: 'poseidon2'
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v4

@@ -4,8 +4,8 @@
 //! curve equation.
 
 use ark_bn254::g1::Config as ArkG1Config;
-use ark_ec::short_weierstrass::SWCurveConfig;
 use ark_ec::CurveConfig;
+use ark_ec::short_weierstrass::SWCurveConfig;
 
 use sunspot_wasm::curve::{G1Affine, G1Config};
 

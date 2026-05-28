@@ -1,5 +1,5 @@
+use crate::curve::Fr;
 use acir::FieldElement;
-use ark_bn254::Fr;
 use ark_ff::{One, Zero};
 
 use super::error::SolveError;

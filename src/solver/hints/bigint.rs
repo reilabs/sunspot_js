@@ -1,5 +1,5 @@
 //! Bigint helpers for emulated-field hints.
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{BigInteger, PrimeField};
 use crypto_bigint::{I2048, U2048};
 

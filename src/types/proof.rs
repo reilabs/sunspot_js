@@ -1,4 +1,4 @@
-use ark_bn254::{G1Affine, G2Affine};
+use crate::curve::{G1Affine, G2Affine};
 use ark_ec::AffineRepr;
 
 /// Groth16+BSB22 proof.

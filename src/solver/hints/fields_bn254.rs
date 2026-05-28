@@ -24,7 +24,7 @@
 //!
 //! Outputs: N_out × 4 Fp limbs, laid out as concatenated 4-limb blocks.
 
-use ark_bn254::{Fq, Fq2, Fq6, Fq12};
+use crate::curve::{Fq, Fq2, Fq6, Fq12, Fr};
 use ark_ff::{Field, PrimeField};
 
 use super::{
@@ -45,7 +45,7 @@ const NAME_DIV_E2: &str = "fields_bn254.divE2Hint";
 pub(super) fn solve_div_e2(
     solver: &Solver<'_>,
     cursor: &mut Cursor<'_>,
-) -> Result<Vec<(u32, ark_bn254::Fr)>, SolveError> {
+) -> Result<Vec<(u32, Fr)>, SolveError> {
     let inputs = read_unwrap_hint_inputs(solver, cursor, NAME_DIV_E2, 4)?;
     let a = fq2_from_inputs(&inputs, 0);
     let b = fq2_from_inputs(&inputs, 2);
@@ -60,7 +60,7 @@ const NAME_INV_E12: &str = "fields_bn254.inverseE12Hint";
 pub(super) fn solve_inverse_e12(
     solver: &Solver<'_>,
     cursor: &mut Cursor<'_>,
-) -> Result<Vec<(u32, ark_bn254::Fr)>, SolveError> {
+) -> Result<Vec<(u32, Fr)>, SolveError> {
     let inputs = read_unwrap_hint_inputs(solver, cursor, NAME_INV_E12, 12)?;
 
     // gnark interleaves C0/C1 sub-fields in pairs and stores each Fp² as
@@ -122,7 +122,7 @@ fn write_fq2_outputs(
     cursor: &mut Cursor<'_>,
     c: Fq2,
     nb_emu_out: usize,
-) -> Result<Vec<(u32, ark_bn254::Fr)>, SolveError> {
+) -> Result<Vec<(u32, Fr)>, SolveError> {
     let expected = nb_emu_out * 2 * NB_LIMBS;
     let limbs = [field_to_wide(&c.c0), field_to_wide(&c.c1)];
     let (start, end) = cursor.read_pair()?;
@@ -147,7 +147,7 @@ fn write_fq2_outputs(
 fn write_fp_limb_outputs(
     cursor: &mut Cursor<'_>,
     limbs: &[Wide],
-) -> Result<Vec<(u32, ark_bn254::Fr)>, SolveError> {
+) -> Result<Vec<(u32, Fr)>, SolveError> {
     let expected = limbs.len() * NB_LIMBS;
     let (start, end) = cursor.read_pair()?;
     let actual = (end - start) as usize;

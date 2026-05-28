@@ -8,8 +8,8 @@
 //! cross-origin isolated (`COOP: same-origin`, `COEP: require-corp`) for
 //! `SharedArrayBuffer` to be available.
 
+use crate::curve::{G1Affine, G2Affine};
 use acir::AcirField;
-use ark_bn254::{G1Affine, G2Affine};
 use ark_ec::AffineRepr;
 use ark_ff::{BigInteger, PrimeField};
 use wasm_bindgen::prelude::*;

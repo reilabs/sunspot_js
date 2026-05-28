@@ -5,7 +5,7 @@
 //! wasm-pack build --release --target web --features bench
 //! ```
 
-use ark_bn254::{Fr, G1Affine, G1Projective, G2Projective};
+use crate::curve::{Fr, G1Affine, G1Projective, G2Projective};
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{One, PrimeField, Zero};
 use std::hint::black_box;

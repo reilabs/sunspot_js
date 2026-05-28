@@ -1,7 +1,7 @@
 //! `internal/hints.Randomize`: 0 inputs, N outputs. Returns N uniformly random
 //! field elements drawn from the OS CSPRNG, matching gnark's behavior.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::UniformRand;
 use rand::rngs::OsRng;
 

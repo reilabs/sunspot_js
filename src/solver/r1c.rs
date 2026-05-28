@@ -1,4 +1,4 @@
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{Field, Zero};
 
 use crate::solver::InstrOutput;

@@ -12,7 +12,7 @@ mod compute_h;
 mod error;
 mod msm;
 
-use ark_bn254::{Fr, G1Projective};
+use crate::curve::{Fr, G1Projective};
 use ark_ec::CurveGroup;
 use ark_ff::UniformRand;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
@@ -136,7 +136,7 @@ pub fn prove(r1cs: &R1CS, solved: SolveOutput, pk: &ProvingKey) -> Result<Proof,
 /// Per-stage timing breakdown of `prove`, in milliseconds. Stages are run
 /// strictly sequentially (no `rayon::join`) so the numbers attribute work to
 /// a single stage instead of overlapping pools.
-#[cfg(feature = "bench")]
+#[cfg(all(feature = "bench", target_arch = "wasm32"))]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ProveStageTimings {
     pub setup_ms: f64,
@@ -151,7 +151,7 @@ pub struct ProveStageTimings {
 /// reflects work done with the full thread pool — useful for spotting the
 /// dominant cost, not for predicting end-to-end wall time (which benefits
 /// from the `rayon::join` overlap in [`prove`]).
-#[cfg(feature = "bench")]
+#[cfg(all(feature = "bench", target_arch = "wasm32"))]
 pub fn prove_with_timings(
     r1cs: &R1CS,
     solved: SolveOutput,

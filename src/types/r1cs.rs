@@ -1,4 +1,4 @@
-use ark_bn254::Fr;
+use crate::curve::Fr;
 
 /// Fully-parsed R1CS.
 #[derive(Debug, Clone)]

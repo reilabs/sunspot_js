@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use ark_bn254::{Fq, Fq2, Fr, G1Affine, G2Affine};
+use crate::curve::{Fq, Fq2, Fr, G1Affine, G2Affine};
 use ark_ff::{BigInt, PrimeField, Zero};
 use byteorder::{BigEndian, ReadBytesExt};
 use rayon::prelude::*;

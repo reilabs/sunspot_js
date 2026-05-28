@@ -1,6 +1,6 @@
 //! Quotient polynomial `H = (A·B − C) / Z` via FFT.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{FftField, Field, One, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use rayon::prelude::*;

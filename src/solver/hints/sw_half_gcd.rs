@@ -14,7 +14,7 @@
 //!   nativeOut[0]   = sign(V₁[1])    (0 = nonneg, 1 = negative)
 //!   emuOut[0..4]   = V₁[0] limbs    (always nonneg)
 //!   emuOut[4..8]   = |V₁[1]| limbs
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{One, Zero};
 use crypto_bigint::NonZero;
 

@@ -12,7 +12,7 @@
 //!                    decomposing for BN254-Fp.
 //!
 //! Outputs: 8 Fr witness values laid out as `[s1_limbs(4), s2_limbs(4)]`.
-use ark_bn254::Fr;
+use crate::curve::Fr;
 
 use super::{
     HINT_HEADER_LEN, HintError,

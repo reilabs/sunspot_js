@@ -1,7 +1,7 @@
 //! Sunspot-local `splitInto64BitLimbsHint`: 1 input, 2 outputs. Outputs
 //! `[v mod 2^64, v >> 64]`.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::PrimeField;
 
 use super::super::cursor::Cursor;

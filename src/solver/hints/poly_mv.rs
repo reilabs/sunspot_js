@@ -27,11 +27,11 @@
 //! (so `(p − 1)·v ≡ −v (mod p)` automatically), and the constraint check
 //! verifies the limb expansion against the same Fr-coefficient interpretation.
 
+use crate::curve::Fr;
 use crate::{
     Solver,
     solver::{Cursor, SolveError},
 };
-use ark_bn254::Fr;
 use crypto_bigint::NonZero;
 
 use super::{

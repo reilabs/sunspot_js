@@ -3,7 +3,7 @@
 //! `big.Int.QuoRem(val, 1 << split, &lo)` — outputs[0] is the high part,
 //! outputs[1] is the low part.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{BigInteger, PrimeField};
 
 use super::super::cursor::Cursor;

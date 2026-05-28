@@ -1,6 +1,6 @@
 //! Groth16 MSM stages: `Ar`, `Bs`, `Bs1`, and the final `Krs` element.
 
-use ark_bn254::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use crate::curve::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{CurveGroup, VariableBaseMSM};
 use ark_ff::Zero;
 
@@ -39,8 +39,7 @@ pub(super) fn prove_ar_bs_bs1(
         result.into_affine()
     };
     let bs = {
-        let msm = <G2Projective as VariableBaseMSM>::msm(g2_b, &wire_values_b)
-            .map_err(ProveError::msm("g2_b"))?;
+        let msm = G2Projective::msm(g2_b, &wire_values_b).map_err(ProveError::msm("g2_b"))?;
         let mut result = msm;
         result += G2Projective::from(g2_beta);
         result += G2Projective::from(g2_delta) * s_scalar;

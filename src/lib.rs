@@ -1,3 +1,5 @@
+#![feature(const_trait_impl)]
+pub mod curve;
 mod error;
 mod parsing;
 mod pedersen_commitments;

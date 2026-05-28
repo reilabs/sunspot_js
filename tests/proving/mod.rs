@@ -4,10 +4,10 @@
 use std::path::PathBuf;
 
 use acir::AcirField;
-use ark_bn254::{G1Affine, G2Affine};
 use ark_ec::AffineRepr;
 use ark_ff::{BigInteger, PrimeField};
 use gnark_verifier_solana::{GnarkProof, GnarkVerifier, GnarkWitness, parse_vk};
+use sunspot_wasm::curve::{G1Affine, G2Affine};
 
 use sunspot_wasm::{GnarkWitness as SunspotWitness, Proof, prove, solve};
 

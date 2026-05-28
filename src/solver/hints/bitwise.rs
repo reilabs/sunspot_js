@@ -1,7 +1,7 @@
 //! `std/math/uints.{and,or,xor}Hint`: 2 inputs, 1 output. Shared bitwise solver;
 //! the op is selected by the per-hint wrapper.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 
 use super::super::cursor::Cursor;
 use super::super::error::SolveError;

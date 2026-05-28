@@ -1,7 +1,7 @@
 //! `constraint/solver.InvZeroHint`: 1 input, 1 output. Returns `1/x` for
 //! non-zero `x`, else `0`. Mirrors gnark's built-in InvZeroHint.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{Field, Zero};
 
 use super::super::cursor::Cursor;

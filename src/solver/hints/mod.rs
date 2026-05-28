@@ -7,7 +7,7 @@
 //!   [3..]   nb_inputs linear expressions: (n, cid_0, vid_0, ..., cid_{n-1}, vid_{n-1})
 //!   [..]    output_start, output_end — output wire range
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{PrimeField, Zero};
 
 use crate::solver::InstrOutput;

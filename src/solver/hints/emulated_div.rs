@@ -17,7 +17,7 @@
 //!   inputs[..]                 = x limbs
 //! Outputs: nbLimbs limbs of `x⁻¹ mod p`.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{Field, PrimeField};
 
 use super::{

@@ -1,6 +1,6 @@
 [target.wasm32-unknown-unknown]
 rustflags = [
-    "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals,+simd128",
+    "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals,+simd128,+relaxed-simd",
     "-C", "link-arg=--shared-memory",
     "-C", "link-arg=--import-memory",
     "-C", "link-arg=--max-memory=4294967296",
@@ -9,6 +9,3 @@ rustflags = [
     "-C", "link-arg=--export=__tls_align",
     "-C", "link-arg=--export=__tls_base",
 ]
-
-
-# Build with: CARGO_UNSTABLE_BUILD_STD=panic_abort,std wasm-pack build --release --target web

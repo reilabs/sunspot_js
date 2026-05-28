@@ -14,7 +14,7 @@
 //!   nbQuoLen quotient limbs, nbLimbs remainder limbs, nbCarryLen carry limbs
 //!   where `nbCarryLen = max(nbMulRes(nbALen,nbBLen), nbMulRes(nbQuoLen,nbLimbs)) - 1`.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::PrimeField;
 
 use crate::{

@@ -3,7 +3,7 @@
 //! cracks a native scalar into limbs so it can be re-bound as an
 //! `Element[BN254Fp]` for the GLV equality check.
 
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::PrimeField;
 
 use super::super::cursor::Cursor;

@@ -1,5 +1,4 @@
-use ark_bn254::{Fr, G1Affine, G2Affine};
-
+use crate::curve::{Fr, G1Affine, G2Affine};
 /// Gnark Groth16 proving key.
 #[derive(Debug, Clone)]
 pub struct ProvingKey {

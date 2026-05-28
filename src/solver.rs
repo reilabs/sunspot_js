@@ -12,7 +12,7 @@ mod linear_expr;
 mod r1c;
 mod state;
 
-use ark_bn254::{Fr, G1Affine};
+use crate::curve::{Fr, G1Affine};
 use ark_ec::AffineRepr;
 use ark_ff::Zero;
 use rayon::prelude::*;

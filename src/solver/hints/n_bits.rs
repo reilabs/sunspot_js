@@ -1,6 +1,6 @@
 //! `std/math/bits.nBits`: 1 input (`val`), N outputs — each output is bit `i`
 //! of `val` (LSB first).
-use ark_bn254::Fr;
+use crate::curve::Fr;
 use ark_ff::{BigInteger, One, PrimeField, Zero};
 
 use super::super::cursor::Cursor;

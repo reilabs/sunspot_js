@@ -4,7 +4,7 @@
 //! and the proof of knowledge is `PoK = Σ vᵢ · basis_exp_sigma[i]`, where
 //! `basis_exp_sigma[i] = basis[i] · σ` for the trusted-setup secret σ.
 
-use ark_bn254::{Fr, G1Affine, G1Projective};
+use crate::curve::{Fr, G1Affine, G1Projective};
 use ark_ec::{AffineRepr, CurveGroup, VariableBaseMSM};
 use ark_ff::{One, PrimeField, Zero};
 use ark_serialize::CanonicalSerialize;

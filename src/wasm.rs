@@ -118,6 +118,23 @@ impl Proof {
     pub fn is_valid(&self) -> bool {
         self.0.is_valid()
     }
+
+    /// Full proof in gnark's `WriteRawTo` wire format — round-trips with
+    /// gnark's `Proof.ReadFrom`. Layout:
+    /// `ar(64) || bs(128) || krs(64) || u32_be(n) || commitments(n*64) || pok(64)`.
+    pub fn as_bytes(&self) -> Vec<u8> {
+        let n = self.0.commitments.len();
+        let mut out = Vec::with_capacity(324 + 64 * n);
+        out.extend_from_slice(&g1_to_bytes(&self.0.ar));
+        out.extend_from_slice(&g2_to_bytes(&self.0.bs));
+        out.extend_from_slice(&g1_to_bytes(&self.0.krs));
+        out.extend_from_slice(&(n as u32).to_be_bytes());
+        for c in &self.0.commitments {
+            out.extend_from_slice(&g1_to_bytes(c));
+        }
+        out.extend_from_slice(&g1_to_bytes(&self.0.commitment_pok));
+        out
+    }
 }
 
 /// Solve the witness and generate a Groth16+BSB22 proof in one shot. Bench

@@ -12,10 +12,9 @@ mod compute_h;
 mod error;
 mod msm;
 
-use crate::curve::{Fr, G1Projective};
+use crate::curve::{Fft, Fr, G1Projective};
 use ark_ec::CurveGroup;
 use ark_ff::UniformRand;
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 
 use crate::solver::SolveOutput;
 use crate::types::CommitmentInfo;
@@ -71,9 +70,8 @@ pub fn prove(r1cs: &R1CS, solved: SolveOutput, pk: &ProvingKey) -> Result<Proof,
     let s_delta = (g1_delta_proj * s_scalar).into_affine();
     let kr_delta = (g1_delta_proj * kr_scalar).into_affine();
 
-    let domain: Radix2EvaluationDomain<Fr> =
-        EvaluationDomain::new(r1cs.body.nb_constraints as usize).ok_or(ProveError::CosetDomain)?;
     let domain_size = pk.domain.cardinality;
+    let domain = Fft::new(domain_size as usize).ok_or(ProveError::CosetDomain)?;
 
     // --- Overlap the FFT-bound `compute_h` with the H-independent MSMs.
     let witness_ref = witness.as_slice();
@@ -209,9 +207,8 @@ pub fn prove_with_timings(
     let s_delta = (g1_delta_proj * s_scalar).into_affine();
     let kr_delta = (g1_delta_proj * kr_scalar).into_affine();
 
-    let domain: Radix2EvaluationDomain<Fr> =
-        EvaluationDomain::new(r1cs.body.nb_constraints as usize).ok_or(ProveError::CosetDomain)?;
     let domain_size = pk.domain.cardinality;
+    let domain = Fft::new(domain_size as usize).ok_or(ProveError::CosetDomain)?;
 
     let witness_ref = witness.as_slice();
 

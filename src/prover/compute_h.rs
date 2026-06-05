@@ -1,8 +1,7 @@
 //! Quotient polynomial `H = (A·B − C) / Z` via FFT.
 
-use crate::curve::Fr;
+use crate::curve::{Fft, Fr, SIMDField};
 use ark_ff::{FftField, Field, One, Zero};
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use rayon::prelude::*;
 
 use super::error::ProveError;
@@ -15,33 +14,30 @@ pub(super) fn compute_h(
     mut a_evals: Vec<Fr>,
     mut b_evals: Vec<Fr>,
     mut c_evals: Vec<Fr>,
-    domain: &Radix2EvaluationDomain<Fr>,
+    fft: &Fft,
 ) -> Result<Vec<Fr>, ProveError> {
-    let n = domain.size();
+    let n = fft.size();
 
     a_evals.resize(n, Fr::zero());
     b_evals.resize(n, Fr::zero());
     c_evals.resize(n, Fr::zero());
 
     // IFFT → coset FFT for each buffer. The three pipelines are independent
-    // (separate buffers, immutable domain refs), so run them in parallel.
-    let coset_domain = domain
-        .get_coset(Fr::GENERATOR)
-        .ok_or(ProveError::CosetDomain)?;
+    // (separate buffers, immutable Fft ref), so run them in parallel.
     rayon::join(
         || {
-            domain.ifft_in_place(&mut a_evals);
-            coset_domain.fft_in_place(&mut a_evals);
+            fft.ifft_in_place(&mut a_evals);
+            fft.coset_fft_in_place(&mut a_evals);
         },
         || {
             rayon::join(
                 || {
-                    domain.ifft_in_place(&mut b_evals);
-                    coset_domain.fft_in_place(&mut b_evals);
+                    fft.ifft_in_place(&mut b_evals);
+                    fft.coset_fft_in_place(&mut b_evals);
                 },
                 || {
-                    domain.ifft_in_place(&mut c_evals);
-                    coset_domain.fft_in_place(&mut c_evals);
+                    fft.ifft_in_place(&mut c_evals);
+                    fft.coset_fft_in_place(&mut c_evals);
                 },
             )
         },
@@ -57,15 +53,18 @@ pub(super) fn compute_h(
     };
 
     a_evals
-        .par_iter_mut()
-        .zip(b_evals.par_iter())
-        .zip(c_evals.par_iter())
+        .par_chunks_mut(2)
+        .zip(b_evals.par_chunks(2))
+        .zip(c_evals.par_chunks(2))
         .for_each(|((a, b), c)| {
-            *a = (*a * b - c) * z_inv;
+            let (ab0, ab1) = Fr::mul_pair(a[0], b[0], a[1], b[1]);
+            let (r0, r1) = Fr::mul_pair(ab0 - c[0], z_inv, ab1 - c[1], z_inv);
+            a[0] = r0;
+            a[1] = r1;
         });
 
     // Coset IFFT: evaluation on the coset → coefficient form.
-    coset_domain.ifft_in_place(&mut a_evals);
+    fft.coset_ifft_in_place(&mut a_evals);
 
     Ok(a_evals)
 }

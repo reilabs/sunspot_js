@@ -118,9 +118,9 @@ pub fn bench_parse_r1cs(bytes: &[u8], iterations: u32) -> Result<BenchResult, Js
 
 #[wasm_bindgen]
 pub fn bench_parse_proving_key(bytes: &[u8], iterations: u32) -> Result<BenchResult, JsError> {
-    ProvingKey::from_bytes(bytes).map_err(err)?;
+    ProvingKey::from_bytes_checked(bytes).map_err(err)?;
     Ok(run(iterations, || {
-        ProvingKey::from_bytes(black_box(bytes)).unwrap()
+        ProvingKey::from_bytes_checked(black_box(bytes)).unwrap()
     }))
 }
 
@@ -154,7 +154,7 @@ pub fn bench_solve(
     let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
     let pk = pk_bytes
         .as_deref()
-        .map(ProvingKey::from_bytes)
+        .map(ProvingKey::from_bytes_unchecked)
         .transpose()
         .map_err(err)?;
     let commitment_keys = pk.as_ref().map(|p| p.commitment_keys.as_slice());
@@ -181,7 +181,7 @@ pub fn bench_prove(
 ) -> Result<BenchResult, JsError> {
     let r1cs = R1CS::from_bytes(ccs_bytes).map_err(err)?;
     let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
-    let pk = ProvingKey::from_bytes(pk_bytes).map_err(err)?;
+    let pk = ProvingKey::from_bytes_unchecked(pk_bytes).map_err(err)?;
     let commitment_keys = if pk.commitment_keys.is_empty() {
         None
     } else {
@@ -257,7 +257,7 @@ pub fn bench_prove_stages(
     assert!(iterations > 0, "iterations must be > 0");
     let r1cs = R1CS::from_bytes(ccs_bytes).map_err(err)?;
     let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
-    let pk = ProvingKey::from_bytes(pk_bytes).map_err(err)?;
+    let pk = ProvingKey::from_bytes_unchecked(pk_bytes).map_err(err)?;
     let commitment_keys = if pk.commitment_keys.is_empty() {
         None
     } else {
@@ -295,7 +295,7 @@ pub fn bench_pedersen_commit(
     pk_bytes: &[u8],
     iterations: u32,
 ) -> Result<Option<BenchResult>, JsError> {
-    let pk = ProvingKey::from_bytes(pk_bytes).map_err(err)?;
+    let pk = ProvingKey::from_bytes_unchecked(pk_bytes).map_err(err)?;
     if pk.commitment_keys.is_empty() {
         return Ok(None);
     }
@@ -316,7 +316,7 @@ pub fn bench_pedersen_prove_knowledge(
     pk_bytes: &[u8],
     iterations: u32,
 ) -> Result<Option<BenchResult>, JsError> {
-    let pk = ProvingKey::from_bytes(pk_bytes).map_err(err)?;
+    let pk = ProvingKey::from_bytes_unchecked(pk_bytes).map_err(err)?;
     if pk.commitment_keys.is_empty() {
         return Ok(None);
     }

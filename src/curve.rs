@@ -23,6 +23,12 @@ mod g2;
 #[cfg(feature = "local-curve")]
 mod msm;
 
+mod fft;
+mod simd;
+
+pub use fft::Fft;
+pub(crate) use simd::SIMDField;
+
 #[cfg(feature = "local-curve")]
 pub use {
     fq::{Fq, FqConfig},

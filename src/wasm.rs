@@ -78,7 +78,13 @@ impl ProvingKey {
     /// Parse a gnark Groth16 `*.pk` proving key (uncompressed BN254 points).
     #[wasm_bindgen(constructor)]
     pub fn new(bytes: &[u8]) -> Result<ProvingKey, JsError> {
-        types::ProvingKey::from_bytes(bytes)
+        types::ProvingKey::from_bytes_checked(bytes)
+            .map(ProvingKey)
+            .map_err(err)
+    }
+
+    pub fn new_unchecked(bytes: &[u8]) -> Result<ProvingKey, JsError> {
+        types::ProvingKey::from_bytes_unchecked(bytes)
             .map(ProvingKey)
             .map_err(err)
     }

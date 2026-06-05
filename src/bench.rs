@@ -125,6 +125,17 @@ pub fn bench_parse_proving_key(bytes: &[u8], iterations: u32) -> Result<BenchRes
 }
 
 #[wasm_bindgen]
+pub fn bench_parse_proving_key_unchecked(
+    bytes: &[u8],
+    iterations: u32,
+) -> Result<BenchResult, JsError> {
+    ProvingKey::from_bytes_unchecked(bytes).map_err(err)?;
+    Ok(run(iterations, || {
+        ProvingKey::from_bytes_unchecked(black_box(bytes)).unwrap()
+    }))
+}
+
+#[wasm_bindgen]
 pub fn bench_parse_gnark_witness(
     acir_json: &[u8],
     witness_stack: &[u8],

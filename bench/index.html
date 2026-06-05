@@ -1,4 +1,23 @@
 <!doctype html>
 <meta charset="utf-8" />
 <title>sunspot_wasm bench</title>
+<style>
+  body { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 1rem; }
+  #status { margin-bottom: 0.5rem; color: #555; }
+  #header { color: #555; margin-bottom: 0.75rem; }
+  .project { margin-bottom: 1.5rem; }
+  .project h2 { font-size: 14px; margin: 0 0 0.25rem 0; }
+  table { border-collapse: collapse; margin-bottom: 0.5rem; }
+  caption { text-align: left; font-weight: bold; padding: 0.25rem 0; }
+  th, td { border: 1px solid #ccc; padding: 2px 8px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { background: #f3f3f3; }
+  tbody tr.pending td { color: #888; font-style: italic; }
+  tbody tr.err td { color: #b00; }
+  tbody tr.skipped td { color: #888; }
+  .err { color: #b00; }
+</style>
+<div id="status">loading…</div>
+<div id="header"></div>
+<div id="projects"></div>
 <script type="module" src="./bench.js"></script>

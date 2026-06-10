@@ -33,14 +33,9 @@ impl MontConfig<4> for FrConfig {
             None => None,
         };
 
-    // ---- the overrides: wasm fast path, with delegation as fallback ----
-
     #[inline(always)]
     fn mul_assign(a: &mut Fp<MontBackend<Self, 4>, 4>, b: &Fp<MontBackend<Self, 4>, 4>) {
         (a.0).0 = bn254_multiplier::rne::mono::mul_fr((a.0).0, (b.0).0);
-        // Multiplier output ∈ [0, 2P); one conditional sub canonicalises.
-        // Bound verified in `tests/bn254_multiplier.rs::
-        // fast_mul_measure_reduction_depth`.
         if a.is_geq_modulus() {
             a.0.sub_with_borrow(&<Self as MontConfig<4>>::MODULUS);
         }

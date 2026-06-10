@@ -21,6 +21,9 @@ mod g1;
 #[cfg(feature = "local-curve")]
 mod g2;
 #[cfg(feature = "local-curve")]
+mod mixed_add;
+
+#[cfg(feature = "local-curve")]
 mod msm;
 
 mod fft;

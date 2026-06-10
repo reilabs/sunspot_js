@@ -13,15 +13,19 @@
 //!
 //! [upstream]: https://github.com/arkworks-rs/algebra/blob/v0.6.0/ec/src/scalar_mul/variable_base/mod.rs
 
-use ark_ec::scalar_mul::variable_base::VariableBaseMSM;
+use ark_ec::{AffineRepr, scalar_mul::variable_base::VariableBaseMSM};
 use ark_ff::{BigInteger, PrimeField};
 use rayon::prelude::*;
 
+use crate::curve::{Fr, mixed_add::MixedAddCurve};
+
 /// Entry point used by `G{1,2}Config::msm`.
-pub(crate) fn msm<V: VariableBaseMSM>(
-    bases: &[V::MulBase],
-    scalars: &[V::ScalarField],
-) -> Result<V, usize> {
+pub(crate) fn msm<V>(bases: &[V::MulBase], scalars: &[V::ScalarField]) -> Result<V, usize>
+where
+    V: VariableBaseMSM<ScalarField = Fr, MulBase = <V as MixedAddCurve>::Affine>
+        + MixedAddCurve
+        + 'static,
+{
     if bases.len() != scalars.len() {
         return Err(bases.len().min(scalars.len()));
     }
@@ -34,10 +38,12 @@ pub(crate) fn msm<V: VariableBaseMSM>(
 
 /// Partition scalars by bit-size, dispatch each group to its specialised
 /// kernel, sum the results. Equivalent to upstream's private `msm_signed`.
-fn msm_signed<V: VariableBaseMSM>(
-    bases: &[V::MulBase],
-    scalars: &[<V::ScalarField as PrimeField>::BigInt],
-) -> V {
+fn msm_signed<V>(bases: &[V::MulBase], scalars: &[<V::ScalarField as PrimeField>::BigInt]) -> V
+where
+    V: VariableBaseMSM<ScalarField = Fr, MulBase = <V as MixedAddCurve>::Affine>
+        + MixedAddCurve
+        + 'static,
+{
     let size = bases.len().min(scalars.len());
     let bases = &bases[..size];
     let scalars = &scalars[..size];
@@ -284,17 +290,14 @@ fn make_digits(a: &impl BigInteger, w: usize, num_bits: usize) -> impl Iterator<
     })
 }
 
-/// Chunks the input so a smaller per-chunk `size` yields a smaller window
-/// `c = ln(size) + 2` and therefore a smaller bucket array `2^c`. The kernel
-/// is already window-parallel, so the chunking is for cache footprint and
-/// prefix-sum cost, not extra parallelism.
-fn msm_bigint_wnaf<V: VariableBaseMSM>(
-    bases: &[V::MulBase],
-    scalars: &[<V::ScalarField as PrimeField>::BigInt],
-) -> V {
+/// Outer chunked wrapper.
+fn msm_bigint_wnaf<C: MixedAddCurve>(
+    bases: &[C::Affine],
+    scalars: &[<Fr as PrimeField>::BigInt],
+) -> C {
     let size = bases.len().min(scalars.len());
     if size == 0 {
-        return V::zero();
+        return C::zero();
     }
     let n = (rayon::current_num_threads() / 2).max(1);
     let chunk_size = {
@@ -304,20 +307,17 @@ fn msm_bigint_wnaf<V: VariableBaseMSM>(
     bases[..size]
         .par_chunks(chunk_size)
         .zip(scalars[..size].par_chunks(chunk_size))
-        .map(|(bases, scalars)| msm_bigint_wnaf_parallel::<V>(bases, scalars))
+        .map(|(b, s)| window_parallel::<C>(b, s))
         .sum()
 }
 
-/// Window-parallel Pippenger/WNAF kernel — runs on the *whole* input slice
-/// it's given. The outer [`msm_bigint_wnaf`] decides chunking; this fn just
-/// computes the MSM of its arguments.
-fn msm_bigint_wnaf_parallel<V: VariableBaseMSM>(
-    bases: &[V::MulBase],
-    scalars: &[<V::ScalarField as PrimeField>::BigInt],
-) -> V {
+fn window_parallel<C: MixedAddCurve>(
+    bases: &[C::Affine],
+    scalars: &[<Fr as PrimeField>::BigInt],
+) -> C {
     let size = bases.len();
     if size == 0 {
-        return V::zero();
+        return C::zero();
     }
 
     let c = if size < 32 {
@@ -326,7 +326,7 @@ fn msm_bigint_wnaf_parallel<V: VariableBaseMSM>(
         ln_without_floats(size) + 2
     };
 
-    let num_bits = V::ScalarField::MODULUS_BIT_SIZE as usize;
+    let num_bits = Fr::MODULUS_BIT_SIZE as usize;
     let digits_count = num_bits.div_ceil(c);
 
     let scalar_digits = scalars
@@ -334,36 +334,47 @@ fn msm_bigint_wnaf_parallel<V: VariableBaseMSM>(
         .flat_map_iter(|s| make_digits(s, c, num_bits))
         .collect::<Vec<_>>();
 
-    let zero = V::ZERO_BUCKET;
-    let window_sums: Vec<_> = (0..digits_count)
+    let window_sums: Vec<C::Bucket> = (0..digits_count)
         .into_par_iter()
         .map(|i| {
-            let mut buckets = vec![zero; 1 << c];
+            let mut buckets = vec![C::IDENTITY_XYZZ; 1usize << c];
             for (digits, base) in scalar_digits.chunks(digits_count).zip(bases) {
-                use core::cmp::Ordering;
                 let scalar = digits[i];
-                match 0.cmp(&scalar) {
-                    Ordering::Less => buckets[(scalar - 1) as usize] += base,
-                    Ordering::Greater => buckets[(-scalar - 1) as usize] -= base,
-                    Ordering::Equal => (),
+                if scalar == 0 {
+                    continue;
                 }
+                // Skip identity bases — `mixed_add` requires `p2 != identity`
+                if base.is_zero() {
+                    continue;
+                }
+                let neg = scalar < 0;
+                let idx = if neg {
+                    (-scalar - 1) as usize
+                } else {
+                    (scalar - 1) as usize
+                };
+                C::add_into(&mut buckets[idx], base, neg);
             }
-            let mut running_sum = V::ZERO_BUCKET;
-            let mut res = V::ZERO_BUCKET;
-            buckets.into_iter().rev().for_each(|b| {
-                running_sum += &b;
+
+            // Prefix-sum stays on curve's bucket (xyzz `add-2008-s`).
+            // O(2^c) per window — small relative to the bucket-add loop.
+            let mut running_sum = C::ZERO_BUCKET;
+            let mut res = C::ZERO_BUCKET;
+            for b in buckets.into_iter().rev() {
+                let ark_b = C::xyzz_to_bucket(b);
+                running_sum += &ark_b;
                 res += &running_sum;
-            });
+            }
             res
         })
         .collect();
 
-    let lowest: V = (*window_sums.first().unwrap()).into();
+    let lowest: C = (*window_sums.first().unwrap()).into();
     lowest
         + window_sums[1..]
             .iter()
             .rev()
-            .fold(V::zero(), |mut total, sum_i| {
+            .fold(C::zero(), |mut total, sum_i| {
                 total += sum_i;
                 for _ in 0..c {
                     total.double_in_place();

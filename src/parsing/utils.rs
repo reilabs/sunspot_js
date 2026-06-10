@@ -1,5 +1,5 @@
 use ark_ec::{AffineRepr, short_weierstrass::SWCurveConfig};
-use ark_ff::{BigInt, PrimeField, Zero};
+use ark_ff::{BigInt, BigInteger, MontConfig, PrimeField, Zero};
 use byteorder::{BigEndian, ReadBytesExt};
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
@@ -285,7 +285,7 @@ fn read_limbs(buf: &[u8]) -> [u64; 4] {
 fn is_on_g1_curve(x: Fq, y: Fq) -> bool {
     let (y_squared, x_squared) = Fq::mul_pair(y, y, x, x);
     let x_cubed = x * x_squared;
-    y_squared == G1Config::add_b(x_cubed)
+    fq_eq(y_squared, G1Config::add_b(x_cubed))
 }
 
 /// `y² ?= x³ + b` for both points in lockstep; each step is one
@@ -295,7 +295,7 @@ fn is_on_g1_curve_pair(xa: Fq, ya: Fq, xb: Fq, yb: Fq) -> bool {
     let (y2a, y2b) = Fq::mul_pair(ya, ya, yb, yb);
     let (x2a, x2b) = Fq::mul_pair(xa, xa, xb, xb);
     let (x3a, x3b) = Fq::mul_pair(x2a, xa, x2b, xb);
-    y2a == x3a + b && y2b == x3b + b
+    fq_eq(y2a, x3a + b) && fq_eq(y2b, x3b + b)
 }
 
 fn is_valid_g2_point(g2: G2Affine) -> bool {
@@ -312,7 +312,26 @@ fn is_on_g2_curve(x: Fq2, y: Fq2) -> bool {
     let y2 = Fq::f2_square(y);
     let x2 = Fq::f2_square(x);
     let x3 = Fq::f2_mul(x2, x);
-    y2 == x3 + b
+    fq2_eq(y2, x3 + b)
+}
+
+#[inline]
+fn fq_eq(a: Fq, b: Fq) -> bool {
+    canonicalize_fq(a) == canonicalize_fq(b)
+}
+
+#[inline]
+fn canonicalize_fq(mut x: Fq) -> Fq {
+    let modulus = <FqConfig as MontConfig<4>>::MODULUS;
+    while x.is_geq_modulus() {
+        x.0.sub_with_borrow(&modulus);
+    }
+    x
+}
+
+#[inline]
+fn fq2_eq(a: Fq2, b: Fq2) -> bool {
+    fq_eq(a.c0, b.c0) && fq_eq(a.c1, b.c1)
 }
 
 #[derive(PartialEq, Eq)]

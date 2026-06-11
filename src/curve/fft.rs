@@ -45,10 +45,11 @@ mod local_fft {
             let omega_inv = omega.inverse()?;
             let n_inv = Fr::from(n as u64).inverse()?;
 
-            let (twiddles_fwd, twiddles_inv) = cfg_join!(
-                || compute_powers(omega, n / 2),
-                || compute_powers(omega_inv, n / 2)
-            );
+            let (twiddles_fwd, twiddles_inv) =
+                cfg_join!(|| compute_powers(omega, n / 2), || compute_powers(
+                    omega_inv,
+                    n / 2
+                ));
             let g = Fr::GENERATOR;
             let g_inv = g.inverse()?;
             let (coset_g_powers, coset_g_inv_powers) =

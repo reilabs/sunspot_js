@@ -24,6 +24,14 @@ pub(super) fn compute_h(
     b_evals.resize(n, Fr::zero());
     c_evals.resize(n, Fr::zero());
 
+    if n == 1 {
+        let z_inv = (Fr::GENERATOR - Fr::one())
+            .inverse()
+            .ok_or(ProveError::ZeroCosetZ)?;
+        a_evals[0] = (a_evals[0] * b_evals[0] - c_evals[0]) * z_inv;
+        return Ok(a_evals);
+    }
+
     // IFFT → coset FFT for each buffer. The three pipelines are independent
     // (separate buffers, immutable Fft ref), so run them in parallel.
     cfg_join!(

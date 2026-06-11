@@ -16,6 +16,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::types;
 
+#[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
 fn err(e: impl std::fmt::Display) -> JsError {
@@ -78,7 +79,13 @@ impl ProvingKey {
     /// Parse a gnark Groth16 `*.pk` proving key (uncompressed BN254 points).
     #[wasm_bindgen(constructor)]
     pub fn new(bytes: &[u8]) -> Result<ProvingKey, JsError> {
-        types::ProvingKey::from_bytes(bytes)
+        types::ProvingKey::from_bytes_checked(bytes)
+            .map(ProvingKey)
+            .map_err(err)
+    }
+
+    pub fn new_unchecked(bytes: &[u8]) -> Result<ProvingKey, JsError> {
+        types::ProvingKey::from_bytes_unchecked(bytes)
             .map(ProvingKey)
             .map_err(err)
     }
@@ -117,6 +124,23 @@ impl Proof {
     }
     pub fn is_valid(&self) -> bool {
         self.0.is_valid()
+    }
+
+    /// Full proof in gnark's `WriteRawTo` wire format — round-trips with
+    /// gnark's `Proof.ReadFrom`. Layout:
+    /// `ar(64) || bs(128) || krs(64) || u32_be(n) || commitments(n*64) || pok(64)`.
+    pub fn as_bytes(&self) -> Vec<u8> {
+        let n = self.0.commitments.len();
+        let mut out = Vec::with_capacity(324 + 64 * n);
+        out.extend_from_slice(&g1_to_bytes(&self.0.ar));
+        out.extend_from_slice(&g2_to_bytes(&self.0.bs));
+        out.extend_from_slice(&g1_to_bytes(&self.0.krs));
+        out.extend_from_slice(&(n as u32).to_be_bytes());
+        for c in &self.0.commitments {
+            out.extend_from_slice(&g1_to_bytes(c));
+        }
+        out.extend_from_slice(&g1_to_bytes(&self.0.commitment_pok));
+        out
     }
 }
 

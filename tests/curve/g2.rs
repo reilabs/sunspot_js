@@ -12,6 +12,8 @@ use rand::SeedableRng;
 
 use sunspot_wasm::curve::{Fr, G2Affine, G2Config, G2Projective};
 
+use crate::curve::to_local_fq2;
+
 #[test]
 fn curve_constants_reflection_matches_upstream() {
     assert_eq!(
@@ -19,19 +21,18 @@ fn curve_constants_reflection_matches_upstream() {
         <ArkG2Config as CurveConfig>::COFACTOR,
     );
     assert_eq!(
-        <G2Config as CurveConfig>::COFACTOR_INV.0,
-        <ArkG2Config as CurveConfig>::COFACTOR_INV.0,
+        ark_bn254::Fr::from(<G2Config as CurveConfig>::COFACTOR_INV),
+        <ArkG2Config as CurveConfig>::COFACTOR_INV,
     );
     let coeff_b_up = <ArkG2Config as SWCurveConfig>::COEFF_B;
     let coeff_b_us = <G2Config as SWCurveConfig>::COEFF_B;
-    assert_eq!(coeff_b_up.c0.0, coeff_b_us.c0.0, "COEFF_B.c0");
-    assert_eq!(coeff_b_up.c1.0, coeff_b_us.c1.0, "COEFF_B.c1");
+    assert_eq!(to_local_fq2(coeff_b_up), coeff_b_us);
+
     let g_up = <ArkG2Config as SWCurveConfig>::GENERATOR;
     let g_us = <G2Config as SWCurveConfig>::GENERATOR;
-    assert_eq!(g_up.x.c0.0, g_us.x.c0.0);
-    assert_eq!(g_up.x.c1.0, g_us.x.c1.0);
-    assert_eq!(g_up.y.c0.0, g_us.y.c0.0);
-    assert_eq!(g_up.y.c1.0, g_us.y.c1.0);
+
+    assert_eq!(to_local_fq2(g_up.x), g_us.x);
+    assert_eq!(to_local_fq2(g_up.y), g_us.y);
 }
 
 #[test]

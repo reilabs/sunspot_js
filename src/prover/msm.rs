@@ -1,8 +1,9 @@
 //! Groth16 MSM stages: `Ar`, `Bs`, `Bs1`, and the final `Krs` element.
 
-use crate::curve::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{CurveGroup, VariableBaseMSM};
+use crate::curve::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, msm};
+use ark_ec::CurveGroup;
 use ark_ff::Zero;
+use ark_std::cfg_join;
 
 use super::error::ProveError;
 use crate::types::Groth16Commitment;
@@ -29,24 +30,24 @@ pub(super) fn prove_ar_bs_bs1(
     // time so we just do contiguous gather here instead of re-scanning the
     // infinity bitmap on every proof.
     let (wire_values_a, wire_values_b) =
-        rayon::join(|| gather(wire_values, idx_a), || gather(wire_values, idx_b));
+        cfg_join!(|| gather(wire_values, idx_a), || gather(wire_values, idx_b));
 
     let ar = {
-        let msm = G1Projective::msm(g1_a, &wire_values_a).map_err(ProveError::msm("g1_a"))?;
+        let msm = msm::<G1Projective>(g1_a, &wire_values_a).map_err(ProveError::msm("g1_a"))?;
         let mut result = msm;
         result += G1Projective::from(g1_alpha);
         result += G1Projective::from(r_delta);
         result.into_affine()
     };
     let bs = {
-        let msm = G2Projective::msm(g2_b, &wire_values_b).map_err(ProveError::msm("g2_b"))?;
+        let msm = msm::<G2Projective>(g2_b, &wire_values_b).map_err(ProveError::msm("g2_b"))?;
         let mut result = msm;
         result += G2Projective::from(g2_beta);
         result += G2Projective::from(g2_delta) * s_scalar;
         result.into_affine()
     };
     let bs1 = {
-        let msm = G1Projective::msm(g1_b, &wire_values_b).map_err(ProveError::msm("g1_b"))?;
+        let msm = msm::<G1Projective>(g1_b, &wire_values_b).map_err(ProveError::msm("g1_b"))?;
         let mut result = msm;
         result += G1Projective::from(g1_beta);
         result += G1Projective::from(s_delta);
@@ -95,26 +96,26 @@ pub(super) fn prove_krs(
 
     let size_h = domain_size as usize - 1;
 
-    let (krs1_result, krs2_result) = rayon::join(
-        || G1Projective::msm(g1_k, &private_wire_values).map_err(ProveError::msm("g1_k")),
+    let (krs1_result, krs2_result) = cfg_join!(
+        || msm::<G1Projective>(g1_k, &private_wire_values).map_err(ProveError::msm("g1_k")),
         || {
             if !h.is_empty() && !g1_z.is_empty() {
                 let h_slice = &h[..size_h.min(h.len())];
                 let z_slice = &g1_z[..size_h.min(g1_z.len())];
                 let min_len = h_slice.len().min(z_slice.len());
-                G1Projective::msm(&z_slice[..min_len], &h_slice[..min_len])
+                msm::<G1Projective>(&z_slice[..min_len], &h_slice[..min_len])
                     .map_err(ProveError::msm("g1_z"))
             } else {
                 Ok(G1Projective::zero())
             }
-        },
+        }
     );
 
     let mut result = krs1_result? + krs2_result?;
     result += G1Projective::from(kr_delta);
 
     // Cross-terms: s·Ar + r·Bs1.
-    let (s_ar, r_bs1) = rayon::join(|| G1Projective::from(ar) * s_scalar, || bs1 * r_scalar);
+    let (s_ar, r_bs1) = cfg_join!(|| G1Projective::from(ar) * s_scalar, || bs1 * r_scalar);
     result += s_ar;
     result += r_bs1;
 

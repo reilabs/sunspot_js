@@ -10,7 +10,7 @@ use crate::{
         PackedInstruction, PlonkCommitment, SectionHeader, SystemType,
     },
 };
-use ark_ff::{BigInt, Fp};
+use ark_ff::BigInt;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use super::ParseError;
@@ -618,7 +618,7 @@ fn parse_coeff_table(mut r: &[u8]) -> Result<Vec<Fr>, ParseError> {
         }
         // gnark stores `fr.Element` in Montgomery form (R = 2^256 mod p);
         // ark-bn254 uses the same R, so the limbs are reused in place.
-        out.push(Fp::new_unchecked(BigInt::new(limbs)));
+        out.push(Fr::new_unchecked(BigInt::new(limbs)));
     }
     if !r.is_empty() {
         return Err(ParseError::Ccs(format!(

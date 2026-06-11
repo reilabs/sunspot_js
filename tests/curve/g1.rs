@@ -16,21 +16,21 @@ fn curve_constants_reflection_matches_upstream() {
         <ArkG1Config as CurveConfig>::COFACTOR,
     );
     assert_eq!(
-        <G1Config as CurveConfig>::COFACTOR_INV.0,
-        <ArkG1Config as CurveConfig>::COFACTOR_INV.0,
+        ark_bn254::Fr::from(<G1Config as CurveConfig>::COFACTOR_INV),
+        <ArkG1Config as CurveConfig>::COFACTOR_INV,
     );
     assert_eq!(
-        <G1Config as SWCurveConfig>::COEFF_A.0,
-        <ArkG1Config as SWCurveConfig>::COEFF_A.0,
+        ark_bn254::Fq::from(<G1Config as SWCurveConfig>::COEFF_A),
+        <ArkG1Config as SWCurveConfig>::COEFF_A,
     );
     assert_eq!(
-        <G1Config as SWCurveConfig>::COEFF_B.0,
-        <ArkG1Config as SWCurveConfig>::COEFF_B.0,
+        ark_bn254::Fq::from(<G1Config as SWCurveConfig>::COEFF_B),
+        <ArkG1Config as SWCurveConfig>::COEFF_B,
     );
     let g_up = <ArkG1Config as SWCurveConfig>::GENERATOR;
     let g_us = <G1Config as SWCurveConfig>::GENERATOR;
-    assert_eq!(g_up.x.0, g_us.x.0, "GENERATOR.x");
-    assert_eq!(g_up.y.0, g_us.y.0, "GENERATOR.y");
+    assert_eq!(g_up.x, ark_bn254::Fq::from(g_us.x), "GENERATOR.x");
+    assert_eq!(g_up.y, ark_bn254::Fq::from(g_us.y), "GENERATOR.y");
 }
 
 #[test]

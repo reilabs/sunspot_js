@@ -7,28 +7,39 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [features]
+default = ["parallel"]
+parallel = [
+    "dep:rayon",
+    "dep:wasm-bindgen-rayon",
+    "ark-ec/parallel",
+    "ark-ff/parallel",
+    "ark-poly/parallel",
+    "ark-std/parallel",
+]
 local-curve = ["dep:bn254-multiplier"]
-bench = ["local-curve", "dep:web-sys", "dep:console_error_panic_hook"]
+bench = ["dep:web-sys", "dep:console_error_panic_hook"]
 
 [dependencies]
 acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.18", features = ["bn254"] }
 ark-bn254 = { version = "0.6", default-features = false, features = ["curve"] }
-ark-ec = { version = "0.6", default-features = false, features = ["parallel"] }
-ark-ff = { version = "0.6", default-features = false, features = ["parallel"] }
+ark-ec = { version = "0.6", default-features = false }
+ark-ff = { version = "0.6", default-features = false }
 ark-grumpkin = { version = "0.6", default-features = false }
-ark-poly = { version = "0.6", default-features = false, features = ["parallel"] }
+ark-poly = { version = "0.6", default-features = false }
 ark-secp256k1 = { version = "0.6", default-features = false }
 ark-secp256r1 = { version = "0.6", default-features = false }
 ark-serialize = { version = "0.6", default-features = false }
-ark-std = { version = "0.6", default-features = false, features = ["parallel"] }
+ark-std = { version = "0.6", default-features = false }
 base64 = "0.22"
 bn254-multiplier = { git = "https://github.com/reilabs/ProveKit.git", branch = "bn254-opts", optional = true }
 byteorder = "1.5"
 ciborium = "0.2"
 console_error_panic_hook = { version = "0.1", optional = true }
 crypto-bigint = "0.7"
+num-bigint = { version = "0.4", default-features = false }
 rand = "0.8"
-rayon = "1.10"
+zeroize = { version = "1", default-features = false }
+rayon = { version = "1.10", optional = true }
 serde_json = "1"
 sha2 = { version = "0.10", default-features = false }
 thiserror = "2"
@@ -37,7 +48,7 @@ web-sys = { version = "0.3", optional = true, features = ["Performance", "Window
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
-wasm-bindgen-rayon = "1.2"
+wasm-bindgen-rayon = { version = "1.2", optional = true }
 
 # Host-only: keeps the Solana toolchain out of wasm builds.
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

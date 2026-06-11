@@ -11,8 +11,8 @@ use sunspot_wasm::curve::{Fq, Fq2Config};
 #[test]
 fn nonresidue_reflection_matches_upstream() {
     assert_eq!(
-        <Fq2Config as Fp2Config>::NONRESIDUE.0,
-        <ArkFq2Config as Fp2Config>::NONRESIDUE.0,
+        ark_bn254::Fq::from(<Fq2Config as Fp2Config>::NONRESIDUE),
+        <ArkFq2Config as Fp2Config>::NONRESIDUE,
     );
 }
 
@@ -30,6 +30,6 @@ fn mul_fp_by_nonresidue_matches_upstream() {
         let mut theirs = a;
         ArkFq2Config::mul_fp_by_nonresidue_in_place(&mut theirs);
 
-        assert_eq!(ours.0, theirs.0);
+        assert_eq!(ark_bn254::Fq::from(ours), theirs);
     }
 }

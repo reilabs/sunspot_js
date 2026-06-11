@@ -4,9 +4,9 @@
 //! and the proof of knowledge is `PoK = Σ vᵢ · basis_exp_sigma[i]`, where
 //! `basis_exp_sigma[i] = basis[i] · σ` for the trusted-setup secret σ.
 
-use crate::curve::{Fr, G1Affine, G1Projective};
-use ark_ec::{AffineRepr, CurveGroup, VariableBaseMSM};
-use ark_ff::{One, PrimeField, Zero};
+use crate::curve::{Fr, G1Affine, G1Projective, msm};
+use ark_ec::{AffineRepr, CurveGroup};
+use ark_ff::{One, PrimeField};
 use ark_serialize::CanonicalSerialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -27,9 +27,6 @@ pub enum PedersenError {
     ExpandMessage(&'static str),
 }
 
-/// Chunk size for Pedersen MSMs.
-const PEDERSEN_MSM_CHUNK: usize = 100_000;
-
 /// Byte length of a BN254 scalar field element.
 pub const FR_BYTES: usize = 32;
 
@@ -42,12 +39,24 @@ pub const BSB22_FOLD_DST: &[u8] = b"G16-BSB22";
 impl PedersenProvingKey {
     /// `commitment = Σ vᵢ · basis[i]`
     pub fn commit(&self, values: &[Fr]) -> Result<G1Affine, PedersenError> {
-        msm("commit", &self.basis, values)
+        crate::curve::msm::<G1Projective>(&self.basis, values)
+            .map(|p| p.into_affine())
+            .map_err(|_| PedersenError::LengthMismatch {
+                label: "commit",
+                actual: values.len(),
+                expected: self.basis.len(),
+            })
     }
 
     /// `pok = Σ vᵢ · basis_exp_sigma[i]`
     pub fn prove_knowledge(&self, values: &[Fr]) -> Result<G1Affine, PedersenError> {
-        msm("prove_knowledge", &self.basis_exp_sigma, values)
+        crate::curve::msm::<G1Projective>(&self.basis_exp_sigma, values)
+            .map(|p| p.into_affine())
+            .map_err(|_| PedersenError::LengthMismatch {
+                label: "prove_knowledge",
+                actual: values.len(),
+                expected: self.basis_exp_sigma.len(),
+            })
     }
 }
 
@@ -118,7 +127,7 @@ pub fn fold(points: &[G1Affine], combination_coeff: Fr) -> G1Affine {
     }
 
     // Lengths match by construction.
-    G1Projective::msm(points, &scalars).unwrap().into_affine()
+    msm::<G1Projective>(points, &scalars).unwrap().into_affine()
 }
 
 /// Canonical 32-byte form of a BN254 scalar (arkworks compressed, little-endian).
@@ -205,29 +214,6 @@ fn expand_message_xmd(
 
     out.truncate(len_in_bytes);
     Ok(out)
-}
-
-fn msm(label: &'static str, basis: &[G1Affine], values: &[Fr]) -> Result<G1Affine, PedersenError> {
-    if values.len() != basis.len() {
-        return Err(PedersenError::LengthMismatch {
-            label,
-            actual: values.len(),
-            expected: basis.len(),
-        });
-    }
-    if values.is_empty() {
-        return Ok(G1Affine::zero());
-    }
-
-    let mut acc = G1Projective::zero();
-    for (b_chunk, v_chunk) in basis
-        .chunks(PEDERSEN_MSM_CHUNK)
-        .zip(values.chunks(PEDERSEN_MSM_CHUNK))
-    {
-        // Lengths match by construction within each chunk pair.
-        acc += G1Projective::msm(b_chunk, v_chunk).unwrap();
-    }
-    Ok(acc.into_affine())
 }
 
 #[cfg(test)]

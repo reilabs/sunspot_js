@@ -15,6 +15,9 @@ mod state;
 use crate::curve::{Fr, G1Affine};
 use ark_ec::AffineRepr;
 use ark_ff::Zero;
+use ark_std::cfg_iter;
+
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use crate::types::CommitmentInfo;
@@ -79,8 +82,7 @@ fn run_solver(r1cs: &R1CS, mut solver: Solver<'_>) -> Result<SolveOutput, SolveE
     let mut committed_values = vec![Vec::<Fr>::new(); nb_commitments];
 
     for level in r1cs.levels.iter() {
-        let results: Vec<InstrOutput> = level
-            .par_iter()
+        let results: Vec<InstrOutput> = cfg_iter!(level)
             .map(|&instr_idx| run_instruction(&solver, instr_idx))
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -190,9 +192,7 @@ fn handle_instruction_output(
 pub fn verify_witness(r1cs: &R1CS, witness: Vec<Fr>) -> Result<(), SolveError> {
     let solver = Solver::from_full_witness(r1cs, witness)?;
     for level in r1cs.levels.iter() {
-        level
-            .par_iter()
-            .try_for_each(|&instr_idx| verify_instruction(&solver, instr_idx))?;
+        cfg_iter!(level).try_for_each(|&instr_idx| verify_instruction(&solver, instr_idx))?;
     }
     Ok(())
 }

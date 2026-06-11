@@ -15,6 +15,8 @@
 
 use ark_ec::{AffineRepr, scalar_mul::variable_base::VariableBaseMSM};
 use ark_ff::{BigInteger, PrimeField};
+use ark_std::{cfg_chunks, cfg_into_iter, cfg_iter};
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use crate::curve::{Fr, mixed_add::MixedAddCurve};
@@ -32,7 +34,7 @@ where
     if bases.is_empty() {
         return Ok(V::zero());
     }
-    let bigints: Vec<_> = scalars.into_par_iter().map(|s| s.into_bigint()).collect();
+    let bigints: Vec<_> = cfg_into_iter!(scalars).map(|s| s.into_bigint()).collect();
     Ok(msm_signed::<V>(bases, &bigints))
 }
 
@@ -51,8 +53,7 @@ where
     // Tag each non-zero scalar with its size group + small-value (if it
     // fits in 16 bits). PackedIndex lets us sort by group with one u64-key
     // sort, then split-at per partition.
-    let mut grouped = scalars
-        .par_iter()
+    let mut grouped = cfg_iter!(scalars)
         .enumerate()
         .filter(|(_, scalar)| !scalar.is_zero())
         .map(|(i, scalar)| {
@@ -88,7 +89,10 @@ where
         })
         .collect::<Vec<_>>();
 
+    #[cfg(feature = "parallel")]
     grouped.par_sort_unstable_by_key(|i| i.group());
+    #[cfg(not(feature = "parallel"))]
+    grouped.sort_unstable_by_key(|i| i.group());
 
     let (u1s, rest) = grouped.split_at(ScalarSize::U1.partition_point(&grouped));
     let (i1s, rest) = rest.split_at(ScalarSize::NegU1.partition_point(rest));
@@ -221,8 +225,7 @@ fn small_value_unzip<A: Send + Sync, B: Send + Sync>(
     grouped: &[PackedIndex],
     f: impl Fn(usize, u16) -> (A, B) + Send + Sync,
 ) -> (Vec<A>, Vec<B>) {
-    grouped
-        .par_iter()
+    cfg_iter!(grouped)
         .map(|&i| f(i.index(), i.value()))
         .unzip::<_, _, Vec<_>, Vec<_>>()
 }
@@ -232,8 +235,7 @@ fn large_value_unzip<A: Send + Sync, B: Send + Sync>(
     grouped: &[PackedIndex],
     f: impl Fn(usize) -> (A, B) + Send + Sync,
 ) -> (Vec<A>, Vec<B>) {
-    grouped
-        .par_iter()
+    cfg_iter!(grouped)
         .map(|&i| f(i.index()))
         .unzip::<_, _, Vec<_>, Vec<_>>()
 }
@@ -299,14 +301,16 @@ fn msm_bigint_wnaf<C: MixedAddCurve>(
     if size == 0 {
         return C::zero();
     }
+    #[cfg(feature = "parallel")]
     let n = (rayon::current_num_threads() / 2).max(1);
+    #[cfg(not(feature = "parallel"))]
+    let n = 1usize;
     let chunk_size = {
         let cs = size / n;
         if cs == 0 { size } else { cs }
     };
-    bases[..size]
-        .par_chunks(chunk_size)
-        .zip(scalars[..size].par_chunks(chunk_size))
+    cfg_chunks!(&bases[..size], chunk_size)
+        .zip(cfg_chunks!(&scalars[..size], chunk_size))
         .map(|(b, s)| window_parallel::<C>(b, s))
         .sum()
 }
@@ -329,13 +333,18 @@ fn window_parallel<C: MixedAddCurve>(
     let num_bits = Fr::MODULUS_BIT_SIZE as usize;
     let digits_count = num_bits.div_ceil(c);
 
+    #[cfg(feature = "parallel")]
     let scalar_digits = scalars
         .into_par_iter()
         .flat_map_iter(|s| make_digits(s, c, num_bits))
         .collect::<Vec<_>>();
+    #[cfg(not(feature = "parallel"))]
+    let scalar_digits = scalars
+        .iter()
+        .flat_map(|s| make_digits(s, c, num_bits))
+        .collect::<Vec<_>>();
 
-    let window_sums: Vec<C::Bucket> = (0..digits_count)
-        .into_par_iter()
+    let window_sums: Vec<C::Bucket> = cfg_into_iter!(0..digits_count)
         .map(|i| {
             let mut buckets = vec![C::IDENTITY_XYZZ; 1usize << c];
             for (digits, base) in scalar_digits.chunks(digits_count).zip(bases) {

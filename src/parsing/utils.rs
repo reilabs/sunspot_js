@@ -1,10 +1,9 @@
 use ark_ec::{AffineRepr, short_weierstrass::SWCurveConfig};
 use ark_ff::{BigInt, PrimeField, Zero};
 use byteorder::{BigEndian, ReadBytesExt};
-use rayon::{
-    iter::{IndexedParallelIterator, ParallelIterator},
-    slice::{ParallelSlice, ParallelSliceMut},
-};
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 use crate::{curve::*, parsing::ParseError};
 
@@ -79,9 +78,21 @@ where
     let mut out = vec![identity(); len];
     let pair_count = len / 2;
     let pair_stride = 2 * stride;
-    out[..2 * pair_count]
-        .par_chunks_exact_mut(2)
-        .zip(buf[..pair_count * pair_stride].par_chunks_exact(pair_stride))
+
+    #[cfg(feature = "parallel")]
+    let (slots, in_bufs) = (
+        out[..2 * pair_count].par_chunks_exact_mut(2),
+        buf[..pair_count * pair_stride].par_chunks_exact(pair_stride),
+    );
+
+    #[cfg(not(feature = "parallel"))]
+    let (slots, in_bufs) = (
+        out[..2 * pair_count].chunks_exact_mut(2),
+        buf[..pair_count * pair_stride].chunks_exact(pair_stride),
+    );
+
+    slots
+        .zip(in_bufs)
         .try_for_each(|(slot, in_buf)| -> Result<(), ParseError> {
             let (p0, p1) = pair_decode(in_buf)?;
             slot[0] = p0;

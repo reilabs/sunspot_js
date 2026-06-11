@@ -2,6 +2,8 @@
 
 use crate::curve::{Fft, Fr, SIMDField};
 use ark_ff::{FftField, Field, One, Zero};
+use ark_std::{cfg_chunks, cfg_chunks_mut, cfg_join};
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use super::error::ProveError;
@@ -24,13 +26,13 @@ pub(super) fn compute_h(
 
     // IFFT → coset FFT for each buffer. The three pipelines are independent
     // (separate buffers, immutable Fft ref), so run them in parallel.
-    rayon::join(
+    cfg_join!(
         || {
             fft.ifft_in_place(&mut a_evals);
             fft.coset_fft_in_place(&mut a_evals);
         },
         || {
-            rayon::join(
+            cfg_join!(
                 || {
                     fft.ifft_in_place(&mut b_evals);
                     fft.coset_fft_in_place(&mut b_evals);
@@ -38,9 +40,9 @@ pub(super) fn compute_h(
                 || {
                     fft.ifft_in_place(&mut c_evals);
                     fft.coset_fft_in_place(&mut c_evals);
-                },
+                }
             )
-        },
+        }
     );
 
     // Pointwise on the coset: a[i] ← (a[i]·b[i] − c[i]) · Z(coset)⁻¹.
@@ -52,10 +54,9 @@ pub(super) fn compute_h(
             .ok_or(ProveError::ZeroCosetZ)?
     };
 
-    a_evals
-        .par_chunks_mut(2)
-        .zip(b_evals.par_chunks(2))
-        .zip(c_evals.par_chunks(2))
+    cfg_chunks_mut!(&mut a_evals, 2)
+        .zip(cfg_chunks!(&b_evals, 2))
+        .zip(cfg_chunks!(&c_evals, 2))
         .for_each(|((a, b), c)| {
             let (ab0, ab1) = Fr::mul_pair(a[0], b[0], a[1], b[1]);
             let (r0, r1) = Fr::mul_pair(ab0 - c[0], z_inv, ab1 - c[1], z_inv);

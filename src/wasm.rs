@@ -16,6 +16,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::types;
 
+#[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
 fn err(e: impl std::fmt::Display) -> JsError {

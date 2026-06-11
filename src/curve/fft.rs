@@ -10,10 +10,9 @@ pub use local_fft::Fft;
 #[cfg(feature = "local-curve")]
 mod local_fft {
     use ark_ff::{FftField, Field, One};
-    use rayon::{
-        iter::{IndexedParallelIterator, ParallelIterator},
-        slice::{ParallelSlice, ParallelSliceMut},
-    };
+    use ark_std::{cfg_chunks, cfg_chunks_mut, cfg_join};
+    #[cfg(feature = "parallel")]
+    use rayon::prelude::*;
 
     use crate::curve::SIMDField;
 
@@ -46,14 +45,14 @@ mod local_fft {
             let omega_inv = omega.inverse()?;
             let n_inv = Fr::from(n as u64).inverse()?;
 
-            let (twiddles_fwd, twiddles_inv) = rayon::join(
+            let (twiddles_fwd, twiddles_inv) = cfg_join!(
                 || compute_powers(omega, n / 2),
-                || compute_powers(omega_inv, n / 2),
+                || compute_powers(omega_inv, n / 2)
             );
             let g = Fr::GENERATOR;
             let g_inv = g.inverse()?;
             let (coset_g_powers, coset_g_inv_powers) =
-                rayon::join(|| compute_powers(g, n), || compute_powers(g_inv, n));
+                cfg_join!(|| compute_powers(g, n), || compute_powers(g_inv, n));
 
             Some(Self {
                 n,
@@ -138,7 +137,7 @@ mod local_fft {
     /// SIMD-paired pointwise scaling: `v[i] *= s` for all i. Even `n` only —
     /// callers in this module always feed power-of-two sizes.
     fn scale_in_place(values: &mut [Fr], s: Fr) {
-        values.par_chunks_mut(2).for_each(|pair| {
+        cfg_chunks_mut!(values, 2).for_each(|pair| {
             if pair.len() == 2 {
                 let (r0, r1) = Fr::mul_pair(pair[0], s, pair[1], s);
                 pair[0] = r0;
@@ -152,9 +151,8 @@ mod local_fft {
     /// Pointwise `v[i] *= powers[i]`. Used for coset pre/post twist.
     fn distribute_powers(values: &mut [Fr], powers: &[Fr]) {
         assert_eq!(values.len(), powers.len());
-        values
-            .par_chunks_mut(2)
-            .zip(powers.par_chunks(2))
+        cfg_chunks_mut!(values, 2)
+            .zip(cfg_chunks!(powers, 2))
             .for_each(|(v_pair, p_pair)| {
                 if v_pair.len() == 2 {
                     let (r0, r1) = Fr::mul_pair(v_pair[0], p_pair[0], v_pair[1], p_pair[1]);
@@ -180,14 +178,14 @@ mod local_fft {
             let w4 = twiddles[n / 4];
             let w8 = twiddles[n / 8];
             let w8_3 = twiddles[3 * n / 8];
-            values.par_chunks_mut(8).for_each(|block| {
+            cfg_chunks_mut!(values, 8).for_each(|block| {
                 radix8_block(block, w4, w8, w8_3);
             });
             gap = 8;
         }
         while gap < n {
             let stride = n / (2 * gap);
-            values.par_chunks_mut(2 * gap).for_each(|chunk| {
+            cfg_chunks_mut!(values, 2 * gap).for_each(|chunk| {
                 butterfly_chunk(chunk, gap, twiddles, stride);
             });
             gap *= 2;

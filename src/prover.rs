@@ -15,6 +15,7 @@ mod msm;
 use crate::curve::{Fft, Fr, G1Projective};
 use ark_ec::CurveGroup;
 use ark_ff::UniformRand;
+use ark_std::cfg_join;
 
 use crate::solver::SolveOutput;
 use crate::types::CommitmentInfo;
@@ -75,7 +76,7 @@ pub fn prove(r1cs: &R1CS, solved: SolveOutput, pk: &ProvingKey) -> Result<Proof,
 
     // --- Overlap the FFT-bound `compute_h` with the H-independent MSMs.
     let witness_ref = witness.as_slice();
-    let (h_result, branch_b_result) = rayon::join(
+    let (h_result, branch_b_result) = cfg_join!(
         move || compute_h::compute_h(a_evals, b_evals, c_evals, &domain),
         || -> Result<_, ProveError> {
             let pok = bsb22_pok(
@@ -100,7 +101,7 @@ pub fn prove(r1cs: &R1CS, solved: SolveOutput, pk: &ProvingKey) -> Result<Proof,
                 s_scalar,
             )?;
             Ok((pok, ar, bs, bs1))
-        },
+        }
     );
 
     let h = h_result?;

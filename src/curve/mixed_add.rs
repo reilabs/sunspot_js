@@ -1,13 +1,10 @@
-mod fq_arith;
 mod g1_mixed_add;
 mod g2_mixed_add;
-mod limb_ops;
 
 use std::ops::AddAssign;
 
 use ark_ec::AffineRepr;
 use ark_ff::AdditiveGroup;
-pub(super) use g2_mixed_add::Fq2Mont;
 
 /// Curve-specific primitives the msm kernel needs.
 pub(super) trait MixedAddCurve:

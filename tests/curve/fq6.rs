@@ -2,19 +2,13 @@
 //! transitively by the Fq12 tests; this file pins down the hand-rolled
 //! `mul_fp2_by_nonresidue` shortcut for the `9 + u` non-residue.
 
-use ark_bn254::{Fq as ArkFq, Fq2 as ArkFq2, Fq6Config as ArkFq6Config};
+use ark_bn254::{Fq2 as ArkFq2, Fq6Config as ArkFq6Config};
 use ark_ff::{Fp6Config, UniformRand};
 use rand::SeedableRng;
 
-use sunspot_wasm::curve::{Fq, Fq2, Fq6Config};
+use sunspot_wasm::curve::Fq6Config;
 
-fn to_local_fq2(x: ArkFq2) -> Fq2 {
-    Fq2::new(Fq::new_unchecked(x.c0.0), Fq::new_unchecked(x.c1.0))
-}
-
-fn to_ark_fq2(x: Fq2) -> ArkFq2 {
-    ArkFq2::new(ArkFq::new_unchecked(x.c0.0), ArkFq::new_unchecked(x.c1.0))
-}
+use crate::curve::{to_ark_fq2, to_local_fq2};
 
 #[test]
 fn mul_fp2_by_nonresidue_matches_upstream() {

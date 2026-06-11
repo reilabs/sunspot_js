@@ -8,9 +8,9 @@ use ark_ec::{
     scalar_mul::glv::GLVConfig,
     short_weierstrass::{Affine, Projective},
 };
-use ark_ff::{AdditiveGroup, PrimeField, fields::Fp};
+use ark_ff::{AdditiveGroup, PrimeField};
 
-use super::{fq::Fq, fr::Fr};
+use super::{Fq, Fr};
 
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct G1Config;
@@ -23,21 +23,21 @@ impl CurveConfig for G1Config {
     type ScalarField = Fr;
 
     const COFACTOR: &'static [u64] = <ArkG1Config as CurveConfig>::COFACTOR;
-    const COFACTOR_INV: Fr = Fp::new_unchecked(<ArkG1Config as CurveConfig>::COFACTOR_INV.0);
+    const COFACTOR_INV: Fr = Fr::new_unchecked(<ArkG1Config as CurveConfig>::COFACTOR_INV.0);
 }
 
-const ENDO_COEFFS_DATA: [Fq; 1] = [Fp::new_unchecked(
+const ENDO_COEFFS_DATA: [Fq; 1] = [Fq::new_unchecked(
     <ArkG1Config as GLVConfig>::ENDO_COEFFS[0].0,
 )];
 
 impl SWCurveConfig for G1Config {
-    const COEFF_A: Fq = Fp::new_unchecked(<ArkG1Config as SWCurveConfig>::COEFF_A.0);
+    const COEFF_A: Fq = Fq::new_unchecked(<ArkG1Config as SWCurveConfig>::COEFF_A.0);
 
-    const COEFF_B: Fq = Fp::new_unchecked(<ArkG1Config as SWCurveConfig>::COEFF_B.0);
+    const COEFF_B: Fq = Fq::new_unchecked(<ArkG1Config as SWCurveConfig>::COEFF_B.0);
 
     const GENERATOR: G1Affine = G1Affine::new_unchecked(
-        Fp::new_unchecked(<ArkG1Config as SWCurveConfig>::GENERATOR.x.0),
-        Fp::new_unchecked(<ArkG1Config as SWCurveConfig>::GENERATOR.y.0),
+        Fq::new_unchecked(<ArkG1Config as SWCurveConfig>::GENERATOR.x.0),
+        Fq::new_unchecked(<ArkG1Config as SWCurveConfig>::GENERATOR.y.0),
     );
 
     /// (0, 0) is not on `y^2 = x^3 + 3` (since b != 0), so it's safe as the
@@ -76,7 +76,7 @@ impl SWCurveConfig for G1Config {
 impl GLVConfig for G1Config {
     const ENDO_COEFFS: &'static [Self::BaseField] = &ENDO_COEFFS_DATA;
 
-    const LAMBDA: Self::ScalarField = Fp::new_unchecked(<ArkG1Config as GLVConfig>::LAMBDA.0);
+    const LAMBDA: Self::ScalarField = Fr::new_unchecked(<ArkG1Config as GLVConfig>::LAMBDA.0);
 
     /// `[(sign, BigInt)]` — BigInt<4> is the same type regardless of which
     /// Fp config wraps it, so the upstream constants reflect through directly.

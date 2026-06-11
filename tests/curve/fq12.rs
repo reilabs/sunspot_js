@@ -4,35 +4,11 @@
 //! integration point where our overrides plug into ark's Fp2/Fp6/Fp12
 //! tower.
 
-use ark_bn254::{Fq as ArkFq, Fq2 as ArkFq2, Fq6 as ArkFq6, Fq12 as ArkFq12};
+use ark_bn254::Fq12 as ArkFq12;
 use ark_ff::{Field, UniformRand, Zero};
 use rand::SeedableRng;
 
-use sunspot_wasm::curve::{Fq, Fq2, Fq6, Fq12};
-
-fn to_local_fq2(x: ArkFq2) -> Fq2 {
-    Fq2::new(Fq::new_unchecked(x.c0.0), Fq::new_unchecked(x.c1.0))
-}
-
-fn to_ark_fq2(x: Fq2) -> ArkFq2 {
-    ArkFq2::new(ArkFq::new_unchecked(x.c0.0), ArkFq::new_unchecked(x.c1.0))
-}
-
-fn to_local_fq6(x: ArkFq6) -> Fq6 {
-    Fq6::new(to_local_fq2(x.c0), to_local_fq2(x.c1), to_local_fq2(x.c2))
-}
-
-fn to_ark_fq6(x: Fq6) -> ArkFq6 {
-    ArkFq6::new(to_ark_fq2(x.c0), to_ark_fq2(x.c1), to_ark_fq2(x.c2))
-}
-
-fn to_local(x: ArkFq12) -> Fq12 {
-    Fq12::new(to_local_fq6(x.c0), to_local_fq6(x.c1))
-}
-
-fn to_ark(x: Fq12) -> ArkFq12 {
-    ArkFq12::new(to_ark_fq6(x.c0), to_ark_fq6(x.c1))
-}
+use crate::curve::{to_ark_fq12, to_local_fq12};
 
 #[test]
 fn mul_agrees_with_ark_bn254_fq12() {
@@ -42,7 +18,7 @@ fn mul_agrees_with_ark_bn254_fq12() {
         let b = ArkFq12::rand(&mut rng);
 
         let expected = a * b;
-        let got = to_ark(to_local(a) * to_local(b));
+        let got = to_ark_fq12(to_local_fq12(a) * to_local_fq12(b));
 
         assert_eq!(got, expected);
     }
@@ -53,7 +29,7 @@ fn square_agrees_with_ark_bn254_fq12() {
     let mut rng = rand::rngs::StdRng::seed_from_u64(0x512_512_512_512);
     for _ in 0..256 {
         let a = ArkFq12::rand(&mut rng);
-        assert_eq!(to_ark(to_local(a).square()), a.square());
+        assert_eq!(to_ark_fq12(to_local_fq12(a).square()), a.square());
     }
 }
 
@@ -65,6 +41,9 @@ fn inverse_agrees_with_ark_bn254_fq12() {
         if a.is_zero() {
             continue;
         }
-        assert_eq!(to_ark(to_local(a).inverse().unwrap()), a.inverse().unwrap());
+        assert_eq!(
+            to_ark_fq12(to_local_fq12(a).inverse().unwrap()),
+            a.inverse().unwrap()
+        );
     }
 }

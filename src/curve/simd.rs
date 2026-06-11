@@ -1,104 +1,107 @@
-//! Two-lane SIMD field-mul helpers
-use ark_ff::{AdditiveGroup, Fp2Config};
+//! `SIMDField` — feature-gated 2-lane SIMD field-mul polyfill.
 
-use crate::curve::{Fq, FqConfig, Fr, FrConfig};
+use ark_ff::{AdditiveGroup, Fp2, Fp2Config, MontConfig, Zero};
 
-use ark_ff::{BigInt, Fp, Fp2, MontBackend, MontConfig, Zero};
+// ---------------------------------------------------------------------------
+// `local-curve` path — fields are `LazyFp<C>`.
+// ---------------------------------------------------------------------------
 
 #[cfg(feature = "local-curve")]
-use ark_ff::BigInteger as _;
+use crate::curve::lazy::{LazyFp, LazyMontConfig};
+
 #[cfg(feature = "local-curve")]
-use bn254_multiplier::rne::{simd_mul_fq, simd_mul_fr};
-
-const N: usize = 4;
-type SimdF<C> = Fp<MontBackend<C, N>, N>;
-
-pub(crate) trait SIMDField<C: MontConfig<N>> {
-    /// Lane-parallel `(v0_a · v0_b, v1_a · v1_b)` on raw Montgomery limbs.
-    #[cfg(feature = "local-curve")]
-    fn mul_pair_limbs(
-        v0_a: [u64; 4],
-        v0_b: [u64; 4],
-        v1_a: [u64; 4],
-        v1_b: [u64; 4],
-    ) -> ([u64; 4], [u64; 4]);
-
-    /// `(a0·b0, a1·b1)`.
+pub(crate) trait SIMDField<C: LazyMontConfig>: Sized + Copy {
     #[inline(always)]
-    fn mul_pair(a0: SimdF<C>, b0: SimdF<C>, a1: SimdF<C>, b1: SimdF<C>) -> (SimdF<C>, SimdF<C>) {
-        #[cfg(feature = "local-curve")]
-        {
-            let (r0_limbs, r1_limbs) = Self::mul_pair_limbs((a0.0).0, (b0.0).0, (a1.0).0, (b1.0).0);
-            let mut r0 = SimdF::<C>::new_unchecked(BigInt(r0_limbs));
-            let mut r1 = SimdF::<C>::new_unchecked(BigInt(r1_limbs));
-            let modulus = C::MODULUS;
-            if r0.is_geq_modulus() {
-                r0.0.sub_with_borrow(&modulus);
-            }
-            if r1.is_geq_modulus() {
-                r1.0.sub_with_borrow(&modulus);
-            }
-            (r0, r1)
-        }
-        #[cfg(not(feature = "local-curve"))]
-        {
-            (a0 * b0, a1 * b1)
-        }
+    fn mul_pair(
+        a0: LazyFp<C>,
+        b0: LazyFp<C>,
+        a1: LazyFp<C>,
+        b1: LazyFp<C>,
+    ) -> (LazyFp<C>, LazyFp<C>) {
+        LazyFp::<C>::simd_mul_pair(a0, b0, a1, b1)
     }
 
-    fn mont_encode_pair(a_raw: [u64; 4], b_raw: [u64; 4]) -> (SimdF<C>, SimdF<C>) {
-        let a = SimdF::<C>::new_unchecked(BigInt(a_raw));
-        let b = SimdF::<C>::new_unchecked(BigInt(b_raw));
-        // `from_bigint` short-circuits zero (no `·R²` needed)
+    #[inline(always)]
+    fn sqr_pair(a: LazyFp<C>, b: LazyFp<C>) -> (LazyFp<C>, LazyFp<C>) {
+        LazyFp::<C>::simd_sqr_pair(a, b)
+    }
+
+    /// Montgomery-encode two canonical `[u64; 4]` limbsets in parallel via
+    /// one `mul_pair(_, R²)`. Short-circuits at zero (`0 · R² = 0`).
+    fn mont_encode_pair(a_raw: [u64; 4], b_raw: [u64; 4]) -> (LazyFp<C>, LazyFp<C>) {
+        let a = LazyFp::<C>::from_raw_limbs(a_raw);
+        let b = LazyFp::<C>::from_raw_limbs(b_raw);
         if a.is_zero() && b.is_zero() {
-            return (SimdF::<C>::ZERO, SimdF::<C>::ZERO);
+            return (LazyFp::<C>::ZERO, LazyFp::<C>::ZERO);
         }
-        let r2 = SimdF::<C>::new_unchecked(C::R2);
+        let r2 = LazyFp::<C>::new_unchecked(<C as MontConfig<4>>::R2);
         Self::mul_pair(a, r2, b, r2)
     }
 
-    /// Multiplies two `Fp2` elements via two `mul_pair` calls.
+    /// Schoolbook-in-pairs Fp2 product: `(c0 = p00 − p11, c1 = p01 + p10)`
+    /// via two `mul_pair` calls.
     #[inline(always)]
-    fn f2_mul<F2C: Fp2Config<Fp = SimdF<C>>>(a: Fp2<F2C>, b: Fp2<F2C>) -> Fp2<F2C> {
+    fn f2_mul<F2C: Fp2Config<Fp = LazyFp<C>>>(a: Fp2<F2C>, b: Fp2<F2C>) -> Fp2<F2C> {
         let (p00, p11) = Self::mul_pair(a.c0, b.c0, a.c1, b.c1);
         let (p01, p10) = Self::mul_pair(a.c0, b.c1, a.c1, b.c0);
         Fp2::new(p00 - p11, p01 + p10)
     }
 
-    fn f2_square<F2C: Fp2Config<Fp = SimdF<C>>>(a: Fp2<F2C>) -> Fp2<F2C> {
-        let c0 = a.c0;
-        let c1 = a.c1;
-        let sum = c0 + c1;
-        let diff = c0 - c1;
-        let c1_doubled = c1.double();
-        let (new_c0, new_c1) = Self::mul_pair(sum, diff, c1_doubled, c0);
+    /// Fp2 squaring `(c0+c1)·(c0−c1) + (2·c0·c1)·u` via one `mul_pair`.
+    fn f2_square<F2C: Fp2Config<Fp = LazyFp<C>>>(a: Fp2<F2C>) -> Fp2<F2C> {
+        let (new_c0, new_c1) = Self::mul_pair(a.c0 + a.c1, a.c0 - a.c1, a.c1.double(), a.c0);
         Fp2::new(new_c0, new_c1)
     }
 }
 
-impl SIMDField<FrConfig> for Fr {
-    #[cfg(feature = "local-curve")]
-    #[inline(always)]
-    fn mul_pair_limbs(
-        v0_a: [u64; 4],
-        v0_b: [u64; 4],
-        v1_a: [u64; 4],
-        v1_b: [u64; 4],
-    ) -> ([u64; 4], [u64; 4]) {
-        simd_mul_fr(v0_a, v0_b, v1_a, v1_b)
+#[cfg(feature = "local-curve")]
+impl<C: LazyMontConfig> SIMDField<C> for LazyFp<C> {}
+
+// ---------------------------------------------------------------------------
+// Non-`local-curve` path — fields are stock ark `Fp<MontBackend<C, 4>, 4>`.
+// Trait shape identical to the lazy path so callers don't need to fork.
+// ---------------------------------------------------------------------------
+
+#[cfg(not(feature = "local-curve"))]
+use ark_ff::{BigInt, MontBackend};
+
+#[cfg(not(feature = "local-curve"))]
+type Fp<C> = ark_ff::Fp<MontBackend<C, 4>, 4>;
+
+#[cfg(not(feature = "local-curve"))]
+pub(crate) trait SIMDField<C: MontConfig<4>>: Sized + Copy {
+    fn mul_pair(a0: Fp<C>, b0: Fp<C>, a1: Fp<C>, b1: Fp<C>) -> (Fp<C>, Fp<C>) {
+        (a0 * b0, a1 * b1)
+    }
+
+    // Trait designed to match the above, even if no current user for
+    // this function
+    #[allow(dead_code)]
+    fn sqr_pair(a: Fp<C>, b: Fp<C>) -> (Fp<C>, Fp<C>) {
+        (a * a, b * b)
+    }
+
+    fn mont_encode_pair(a_raw: [u64; 4], b_raw: [u64; 4]) -> (Fp<C>, Fp<C>) {
+        let a = Fp::<C>::new_unchecked(BigInt(a_raw));
+        let b = Fp::<C>::new_unchecked(BigInt(b_raw));
+        if a.is_zero() && b.is_zero() {
+            return (Fp::<C>::ZERO, Fp::<C>::ZERO);
+        }
+        let r2 = Fp::<C>::new_unchecked(C::R2);
+        Self::mul_pair(a, r2, b, r2)
+    }
+
+    fn f2_mul<F2C: Fp2Config<Fp = Fp<C>>>(a: Fp2<F2C>, b: Fp2<F2C>) -> Fp2<F2C> {
+        let (p00, p11) = Self::mul_pair(a.c0, b.c0, a.c1, b.c1);
+        let (p01, p10) = Self::mul_pair(a.c0, b.c1, a.c1, b.c0);
+        Fp2::new(p00 - p11, p01 + p10)
+    }
+
+    fn f2_square<F2C: Fp2Config<Fp = Fp<C>>>(a: Fp2<F2C>) -> Fp2<F2C> {
+        let (new_c0, new_c1) = Self::mul_pair(a.c0 + a.c1, a.c0 - a.c1, a.c1.double(), a.c0);
+        Fp2::new(new_c0, new_c1)
     }
 }
 
-impl SIMDField<FqConfig> for Fq {
-    #[cfg(feature = "local-curve")]
-    #[inline(always)]
-    fn mul_pair_limbs(
-        v0_a: [u64; 4],
-        v0_b: [u64; 4],
-        v1_a: [u64; 4],
-        v1_b: [u64; 4],
-    ) -> ([u64; 4], [u64; 4]) {
-        #[cfg(feature = "local-curve")]
-        simd_mul_fq(v0_a, v0_b, v1_a, v1_b)
-    }
-}
+#[cfg(not(feature = "local-curve"))]
+impl<C: MontConfig<4>> SIMDField<C> for Fp<C> {}

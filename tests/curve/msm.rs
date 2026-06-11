@@ -4,44 +4,13 @@ use ark_bn254::{
     Fr as ArkFr, G1Affine as ArkG1Affine, G1Projective as ArkG1Projective, G2Affine as ArkG2Affine,
     G2Projective as ArkG2Projective,
 };
-use ark_ec::{AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM};
-use ark_ff::{UniformRand, Zero, fields::Fp};
+use ark_ec::{CurveGroup, PrimeGroup, VariableBaseMSM};
+use ark_ff::{UniformRand, Zero};
 use rand::SeedableRng;
 
-use sunspot_wasm::curve::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use sunspot_wasm::curve::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 
-fn to_local_g1(p: ArkG1Affine) -> G1Affine {
-    if p.is_zero() {
-        G1Affine::identity()
-    } else {
-        G1Affine::new_unchecked(Fq::new_unchecked(p.x.0), Fq::new_unchecked(p.y.0))
-    }
-}
-
-fn to_local_g2(p: ArkG2Affine) -> G2Affine {
-    if p.is_zero() {
-        G2Affine::identity()
-    } else {
-        let x = Fq2::new(Fq::new_unchecked(p.x.c0.0), Fq::new_unchecked(p.x.c1.0));
-        let y = Fq2::new(Fq::new_unchecked(p.y.c0.0), Fq::new_unchecked(p.y.c1.0));
-        G2Affine::new_unchecked(x, y)
-    }
-}
-
-fn to_ark_g1(p: G1Projective) -> ArkG1Projective {
-    ArkG1Projective::new_unchecked(
-        Fp::new_unchecked(p.x.0),
-        Fp::new_unchecked(p.y.0),
-        Fp::new_unchecked(p.z.0),
-    )
-}
-
-fn to_ark_g2(p: G2Projective) -> ArkG2Projective {
-    let map = |f: Fq2| -> ark_bn254::Fq2 {
-        ark_bn254::Fq2::new(Fp::new_unchecked(f.c0.0), Fp::new_unchecked(f.c1.0))
-    };
-    ArkG2Projective::new_unchecked(map(p.x), map(p.y), map(p.z))
-}
+use crate::curve::{to_ark_g1, to_ark_g2, to_local_g1, to_local_g2};
 
 fn run_g1(n: usize, seed: u64) {
     let mut rng = rand::rngs::StdRng::seed_from_u64(seed);

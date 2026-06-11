@@ -6,11 +6,11 @@ use ark_ec::{
     scalar_mul::glv::GLVConfig,
     short_weierstrass::{Affine, Projective},
 };
-use ark_ff::{AdditiveGroup, Field, MontFp, PrimeField, Zero as _, fields::Fp};
+use ark_ff::{AdditiveGroup, Field, MontFp, PrimeField, Zero as _};
 
 use super::from_upstream;
 
-use super::{fq2::Fq2, fr::Fr};
+use super::{Fr, fq2::Fq2};
 
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct G2Config;
@@ -24,7 +24,7 @@ impl CurveConfig for G2Config {
 
     const COFACTOR: &'static [u64] = <ArkG2Config as CurveConfig>::COFACTOR;
 
-    const COFACTOR_INV: Fr = Fp::new_unchecked(<ArkG2Config as CurveConfig>::COFACTOR_INV.0);
+    const COFACTOR_INV: Fr = Fr::new_unchecked(<ArkG2Config as CurveConfig>::COFACTOR_INV.0);
 }
 
 impl SWCurveConfig for G2Config {
@@ -72,7 +72,7 @@ const ENDO_COEFFS_DATA: [Fq2; 1] = [from_upstream(<ArkG2Config as GLVConfig>::EN
 impl GLVConfig for G2Config {
     const ENDO_COEFFS: &'static [Self::BaseField] = &ENDO_COEFFS_DATA;
 
-    const LAMBDA: Self::ScalarField = Fp::new_unchecked(<ArkG2Config as GLVConfig>::LAMBDA.0);
+    const LAMBDA: Self::ScalarField = Fr::new_unchecked(<ArkG2Config as GLVConfig>::LAMBDA.0);
 
     const SCALAR_DECOMP_COEFFS: [(bool, <Self::ScalarField as PrimeField>::BigInt); 4] =
         <ArkG2Config as GLVConfig>::SCALAR_DECOMP_COEFFS;
@@ -94,16 +94,22 @@ impl GLVConfig for G2Config {
 
 /// Frobenius coefficient for the x-coordinate of the
 /// twist.
-const P_POWER_ENDOMORPHISM_COEFF_0: Fq2 = Fq2::new(
-    MontFp!("21575463638280843010398324269430826099269044274347216827212613867836435027261"),
-    MontFp!("10307601595873709700152284273816112264069230130616436755625194854815875713954"),
-);
+const P_POWER_ENDOMORPHISM_COEFF_0: Fq2 = {
+    const A0: ark_bn254::Fq =
+        MontFp!("21575463638280843010398324269430826099269044274347216827212613867836435027261");
+    const A1: ark_bn254::Fq =
+        MontFp!("10307601595873709700152284273816112264069230130616436755625194854815875713954");
+    Fq2::new(from_upstream(A0), from_upstream(A1))
+};
 
 ///  Frobenius coefficient for the y-coordinate.
-const P_POWER_ENDOMORPHISM_COEFF_1: Fq2 = Fq2::new(
-    MontFp!("2821565182194536844548159561693502659359617185244120367078079554186484126554"),
-    MontFp!("3505843767911556378687030309984248845540243509899259641013678093033130930403"),
-);
+const P_POWER_ENDOMORPHISM_COEFF_1: Fq2 = {
+    const B0: ark_bn254::Fq =
+        MontFp!("2821565182194536844548159561693502659359617185244120367078079554186484126554");
+    const B1: ark_bn254::Fq =
+        MontFp!("3505843767911556378687030309984248845540243509899259641013678093033130930403");
+    Fq2::new(from_upstream(B0), from_upstream(B1))
+};
 
 /// `6 X²` where X is the BN254 parameter.
 const SIX_X_SQUARED: [u64; 2] = [17887900258952609094, 8020209761171036667];

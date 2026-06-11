@@ -1,11 +1,5 @@
-//! Local BN254 curve types
-//! When compiled with local-curve
-// On wasm32, builds without `local-curve` are silently slow.
-#[cfg(all(target_arch = "wasm32", not(feature = "local-curve")))]
-compile_error!(
-    "wasm32 release build without the `local-curve` feature will be ~2× slower \
-     Enable `local-curve` (or build with `--features bench` which implies it)."
-);
+//! Local BN254 curve types when compiled with local-curve
+
 #[cfg(feature = "local-curve")]
 mod fq12;
 #[cfg(feature = "local-curve")]
@@ -18,19 +12,16 @@ mod g1;
 mod g2;
 #[cfg(feature = "local-curve")]
 mod lazy;
-#[cfg(feature = "local-curve")]
 mod mixed_add;
-
-#[cfg(feature = "local-curve")]
 mod msm;
 
 mod fft;
 mod simd;
 
-pub use fft::Fft;
-pub(crate) use simd::SIMDField;
-
 pub use ark_bn254::{FqConfig, FrConfig};
+pub use fft::Fft;
+pub(crate) use msm::msm;
+pub(crate) use simd::SIMDField;
 
 #[cfg(feature = "local-curve")]
 pub use {

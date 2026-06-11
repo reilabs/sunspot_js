@@ -17,7 +17,7 @@ parallel = [
     "ark-std/parallel",
 ]
 local-curve = ["dep:bn254-multiplier"]
-bench = ["local-curve", "dep:web-sys", "dep:console_error_panic_hook"]
+bench = ["dep:web-sys", "dep:console_error_panic_hook"]
 
 [dependencies]
 acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.18", features = ["bn254"] }

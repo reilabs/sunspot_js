@@ -1,0 +1,78 @@
+{
+  "name": "@reilabs/sunspot_js",
+  "version": "0.1.0",
+  "description": "Groth16 prover for Noir circuits in browser.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/reilabs/sunspot_js.git",
+    "directory": "js"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./simd-mt": {
+      "types": "./dist/simd-mt.d.ts",
+      "default": "./dist/simd-mt.js"
+    },
+    "./simd-st": {
+      "types": "./dist/simd-st.d.ts",
+      "default": "./dist/simd-st.js"
+    },
+    "./sisd-mt": {
+      "types": "./dist/sisd-mt.d.ts",
+      "default": "./dist/sisd-mt.js"
+    },
+    "./sisd-st": {
+      "types": "./dist/sisd-st.d.ts",
+      "default": "./dist/sisd-st.js"
+    },
+    "./wasm-simd-mt/*": "./wasm-simd-mt/*",
+    "./wasm-simd-st/*": "./wasm-simd-st/*",
+    "./wasm-sisd-mt/*": "./wasm-sisd-mt/*",
+    "./wasm-sisd-st/*": "./wasm-sisd-st/*"
+  },
+  "files": [
+    "dist",
+    "wasm-simd-mt/sunspot_wasm.js",
+    "wasm-simd-mt/sunspot_wasm.d.ts",
+    "wasm-simd-mt/sunspot_wasm_bg.wasm",
+    "wasm-simd-mt/sunspot_wasm_bg.wasm.d.ts",
+    "wasm-simd-mt/snippets",
+    "wasm-simd-st/sunspot_wasm.js",
+    "wasm-simd-st/sunspot_wasm.d.ts",
+    "wasm-simd-st/sunspot_wasm_bg.wasm",
+    "wasm-simd-st/sunspot_wasm_bg.wasm.d.ts",
+    "wasm-sisd-mt/sunspot_wasm.js",
+    "wasm-sisd-mt/sunspot_wasm.d.ts",
+    "wasm-sisd-mt/sunspot_wasm_bg.wasm",
+    "wasm-sisd-mt/sunspot_wasm_bg.wasm.d.ts",
+    "wasm-sisd-mt/snippets",
+    "wasm-sisd-st/sunspot_wasm.js",
+    "wasm-sisd-st/sunspot_wasm.d.ts",
+    "wasm-sisd-st/sunspot_wasm_bg.wasm",
+    "wasm-sisd-st/sunspot_wasm_bg.wasm.d.ts"
+  ],
+  "scripts": {
+    "build:wasm": "./scripts/build-wasm.sh",
+    "build:ts": "tsc",
+    "build": "yarn build:wasm && yarn build:ts",
+    "clean": "rm -rf dist wasm-simd-mt wasm-simd-st wasm-sisd-mt wasm-sisd-st",
+    "prepack": "yarn clean && yarn build"
+  },
+  "dependencies": {
+    "@noir-lang/noir_js": "1.0.0-beta.18"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  },
+  "sideEffects": [
+    "./wasm-simd-mt/snippets/*",
+    "./wasm-sisd-mt/snippets/*"
+  ]
+}

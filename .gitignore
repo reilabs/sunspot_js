@@ -95,3 +95,11 @@ Cargo.lock
 # End of https://www.toptal.com/developers/gitignore/api/rust,go,visualstudiocode,macos
 
 node_modules
+js/dist/
+js/wasm-simd-mt/
+js/wasm-simd-st/
+js/wasm-sisd-mt/
+js/wasm-sisd-st/
+js/*.tgz
+.yarn/
+.pnp.*

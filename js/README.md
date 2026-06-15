@@ -83,7 +83,7 @@ const pk   = new ProvingKey(new Uint8Array(await (await fetch('./circuit.pk')).a
 
 // 5. Prove. Result is a gnark Proof.WriteRawTo-compatible byte blob.
 const proof = prove(r1cs, gnarkWitness, pk);
-const wireBytes = proof.as_bytes();   // round-trips with gnark's Proof.ReadFrom
+const wireBytes = proof.asBytes();    // round-trips with gnark's Proof.ReadFrom
 ```
 
 Pinning a specific build is just an import-path change — the API is
@@ -113,7 +113,7 @@ import { init, prove } from '@reilabs/sunspot_js/sisd-st'; // scalar fallback, s
 - `class GnarkWitness(acirJsonBytes, witnessStackBytes)` — build the gnark-ordered witness.
 - `class R1CS(bytes)` — parse a gnark `*.ccs` constraint system.
 - `class ProvingKey(bytes)` — parse a gnark Groth16 `*.pk` file.
-- `class Proof` — `as_bytes()`, `ar_bytes()`, `bs_bytes()`, `krs_bytes()`, `commitments_bytes()`, `commitment_pok_bytes()`, `nb_commitments()`, `is_valid()`.
+- `class Proof` — `asBytes()`, `arBytes()`, `bsBytes()`, `krsBytes()`, `commitmentsBytes()`, `commitmentPokBytes()`, `nbCommitments()`, `isValid()`.
 - `prove(r1cs, witness, pk): Proof` — solve + prove in one shot.
 
 Re-exported from `@noir-lang/noir_js`:

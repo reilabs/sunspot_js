@@ -48,13 +48,20 @@ build_st wasm-simd-st --features local-curve
 build_mt wasm-sisd-mt
 build_st wasm-sisd-st
 
-# wasm-pack writes its own package.json into each --out-dir; we ignore it
-# because the published package.json lives at js/package.json. Remove the
-# generated ones so they can't accidentally be picked up.
 for dir in wasm-simd-mt wasm-simd-st wasm-sisd-mt wasm-sisd-st; do
   rm -f "${JS_DIR}/${dir}/package.json" \
         "${JS_DIR}/${dir}/.gitignore" \
         "${JS_DIR}/${dir}/README.md"
+done
+
+# Rewrite the worker helper's directory import to an explicit file — yarn1
+# strips nested package.json from local-tarball installs, breaking the default
+# `import('../../..')` directory resolution.
+for dir in wasm-simd-mt wasm-sisd-mt; do
+  helper=("${JS_DIR}/${dir}"/snippets/wasm-bindgen-rayon-*/src/workerHelpers.js)
+  sed -i.bak "s|import('\\.\\./\\.\\./\\.\\.')|import('../../../sunspot_wasm.js')|" \
+    "${helper[0]}"
+  rm -f "${helper[0]}.bak"
 done
 
 echo "==> wasm builds complete"

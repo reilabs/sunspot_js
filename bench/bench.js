@@ -23,16 +23,28 @@ const BENCHES = [
     call: (a, iters) => sw.bench_parse_r1cs(a.ccs, iters),
   },
   {
-    name: "parse_proving_key",
+    name: "parse_proving_key_streaming",
     needs: ["pk"],
     table: "timings",
     call: (a, iters) => sw.bench_parse_proving_key(a.pk, iters),
   },
   {
-    name: "parse_proving_key_unchecked",
+    name: "parse_proving_key_batched",
+    needs: ["pk"],
+    table: "timings",
+    call: (a, iters) => sw.bench_parse_proving_key_batched(a.pk, iters),
+  },
+  {
+    name: "parse_proving_key_streaming_unchecked",
     needs: ["pk"],
     table: "timings",
     call: (a, iters) => sw.bench_parse_proving_key_unchecked(a.pk, iters),
+  },
+  {
+    name: "parse_proving_key_batched_unchecked",
+    needs: ["pk"],
+    table: "timings",
+    call: (a, iters) => sw.bench_parse_proving_key_unchecked_batched(a.pk, iters),
   },
   {
     name: "solve",
@@ -46,22 +58,6 @@ const BENCHES = [
     table: "timings",
     call: (a, iters) => sw.bench_prove(a.ccs, a.json, a.gz, a.pk, iters),
   },
-  {
-    name: "prove_stages",
-    needs: ["ccs", "json", "gz", "pk"],
-    table: "stages",
-    call: (a, iters) =>
-      sw.bench_prove_stages(a.ccs, a.json, a.gz, a.pk, iters),
-    serialize: (r) => ({
-      iterations: r.iterations,
-      setup_ms: r.setup_ms,
-      compute_h_ms: r.compute_h_ms,
-      bsb22_pok_ms: r.bsb22_pok_ms,
-      prove_ar_bs_bs1_ms: r.prove_ar_bs_bs1_ms,
-      prove_krs_ms: r.prove_krs_ms,
-      total_sequential_ms: r.total_sequential_ms,
-    }),
-  }
 ];
 
 // Tuned so each sample takes ~tens of µs (median Fr mul ≈ a few hundred

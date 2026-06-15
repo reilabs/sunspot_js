@@ -34,6 +34,8 @@ type WasmModule = {
   R1CS: new (bytes: Uint8Array) => Wasm.R1CS;
   ProvingKey: (new (bytes: Uint8Array) => Wasm.ProvingKey) & {
     new_unchecked: (bytes: Uint8Array) => Wasm.ProvingKey;
+    from_response: (res: Response) => Promise<Wasm.ProvingKey>;
+    from_response_unchecked: (res: Response) => Promise<Wasm.ProvingKey>;
   };
   prove: (r1cs: Wasm.R1CS, w: Wasm.GnarkWitness, pk: Wasm.ProvingKey) => Wasm.Proof;
 };
@@ -94,8 +96,8 @@ export class GnarkWitness {
   constructor(acirJsonBytes: Uint8Array, witnessStackBytes: Uint8Array) {
     this.inner = new (requireMod().GnarkWitness)(acirJsonBytes, witnessStackBytes);
   }
-  private_bytes(): Uint8Array { return this.inner.private_bytes(); }
-  public_bytes(): Uint8Array { return this.inner.public_bytes(); }
+  privateBytes(): Uint8Array { return this.inner.private_bytes(); }
+  publicBytes(): Uint8Array { return this.inner.public_bytes(); }
   free(): void { this.inner.free(); }
   [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
 }
@@ -114,26 +116,40 @@ export class ProvingKey {
   constructor(bytes: Uint8Array) {
     this.inner = new (requireMod().ProvingKey)(bytes);
   }
-  static new_unchecked(bytes: Uint8Array): ProvingKey {
-    const w = Object.create(ProvingKey.prototype) as { inner: Wasm.ProvingKey };
-    w.inner = requireMod().ProvingKey.new_unchecked(bytes);
-    return w as ProvingKey;
+  static newUnchecked(bytes: Uint8Array): ProvingKey {
+    return wrap(requireMod().ProvingKey.new_unchecked(bytes));
+  }
+  /**
+   * Stream a proving key directly from a `fetch()` response.
+   */
+  static async from(src: Response | Promise<Response>): Promise<ProvingKey> {
+    return wrap(await requireMod().ProvingKey.from_response(await src));
+  }
+  /** Same as {@link from} but skips on-curve checks. */
+  static async fromUnchecked(src: Response | Promise<Response>): Promise<ProvingKey> {
+    return wrap(await requireMod().ProvingKey.from_response_unchecked(await src));
   }
   free(): void { this.inner.free(); }
   [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
 }
 
+function wrap(inner: Wasm.ProvingKey): ProvingKey {
+  const w = Object.create(ProvingKey.prototype) as { inner: Wasm.ProvingKey };
+  w.inner = inner;
+  return w as ProvingKey;
+}
+
 export class Proof {
   /** @internal */ readonly inner: Wasm.Proof;
   /** @internal */ constructor(inner: Wasm.Proof) { this.inner = inner; }
-  ar_bytes(): Uint8Array { return this.inner.ar_bytes(); }
-  as_bytes(): Uint8Array { return this.inner.as_bytes(); }
-  bs_bytes(): Uint8Array { return this.inner.bs_bytes(); }
-  commitment_pok_bytes(): Uint8Array { return this.inner.commitment_pok_bytes(); }
-  commitments_bytes(): Uint8Array { return this.inner.commitments_bytes(); }
-  is_valid(): boolean { return this.inner.is_valid(); }
-  krs_bytes(): Uint8Array { return this.inner.krs_bytes(); }
-  nb_commitments(): number { return this.inner.nb_commitments(); }
+  arBytes(): Uint8Array { return this.inner.ar_bytes(); }
+  asBytes(): Uint8Array { return this.inner.as_bytes(); }
+  bsBytes(): Uint8Array { return this.inner.bs_bytes(); }
+  commitmentPokBytes(): Uint8Array { return this.inner.commitment_pok_bytes(); }
+  commitmentsBytes(): Uint8Array { return this.inner.commitments_bytes(); }
+  isValid(): boolean { return this.inner.is_valid(); }
+  krsBytes(): Uint8Array { return this.inner.krs_bytes(); }
+  nbCommitments(): number { return this.inner.nb_commitments(); }
   free(): void { this.inner.free(); }
   [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
 }

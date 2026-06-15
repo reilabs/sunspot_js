@@ -13,6 +13,8 @@ use acir::AcirField;
 use ark_ec::AffineRepr;
 use ark_ff::{BigInteger, PrimeField};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::js_sys::{Reflect, Uint8Array};
 
 use crate::types;
 
@@ -89,6 +91,69 @@ impl ProvingKey {
             .map(ProvingKey)
             .map_err(err)
     }
+
+    /// Stream-parse a proving key directly from a `fetch()` response.
+    pub async fn from_response(res: web_sys::Response) -> Result<ProvingKey, JsError> {
+        from_response_streaming(res, true).await
+    }
+
+    /// Same as [`Self::from_response`] but skips on-curve checks. Only safe
+    /// for trusted keys.
+    pub async fn from_response_unchecked(res: web_sys::Response) -> Result<ProvingKey, JsError> {
+        from_response_streaming(res, false).await
+    }
+}
+
+async fn from_response_streaming(
+    res: web_sys::Response,
+    check_points: bool,
+) -> Result<ProvingKey, JsError> {
+    if !res.ok() {
+        return Err(JsError::new(&format!(
+            "fetch failed: {} {}",
+            res.status(),
+            res.status_text()
+        )));
+    }
+    let body = res
+        .body()
+        .ok_or_else(|| JsError::new("response has no body to stream"))?;
+    let reader: web_sys::ReadableStreamDefaultReader = body
+        .get_reader()
+        .dyn_into()
+        .map_err(|_| JsError::new("expected default reader from response body"))?;
+
+    let mut parser = types::ProvingKey::streaming_parser(check_points);
+    let mut buf: Vec<u8> = Vec::new();
+    while let Some(arr) = next_chunk(&reader).await? {
+        let len = arr.length() as usize;
+        buf.resize(len, 0);
+        arr.copy_to(&mut buf);
+        parser.feed(&buf).map_err(err)?;
+    }
+    parser.finish().map(ProvingKey).map_err(err)
+}
+
+async fn next_chunk(
+    reader: &web_sys::ReadableStreamDefaultReader,
+) -> Result<Option<Uint8Array>, JsError> {
+    let result = JsFuture::from(reader.read()).await.map_err(jserr)?;
+    let done = Reflect::get(&result, &JsValue::from_str("done"))
+        .map_err(jserr)?
+        .as_bool()
+        .ok_or_else(|| JsError::new("stream read result missing boolean `done` field"))?;
+    if done {
+        return Ok(None);
+    }
+    let value = Reflect::get(&result, &JsValue::from_str("value")).map_err(jserr)?;
+    value
+        .dyn_into::<Uint8Array>()
+        .map(Some)
+        .map_err(|_| JsError::new("stream chunk was not a Uint8Array"))
+}
+
+fn jserr(v: JsValue) -> JsError {
+    JsError::new(&v.as_string().unwrap_or_else(|| format!("{v:?}")))
 }
 
 /// Groth16+BSB22 proof. Byte accessors return curve points in the gnark

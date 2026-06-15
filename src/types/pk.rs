@@ -1,6 +1,6 @@
 use crate::curve::{Fr, G1Affine, G2Affine};
 /// Gnark Groth16 proving key.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProvingKey {
     pub domain: Domain,
 
@@ -29,7 +29,7 @@ pub struct ProvingKey {
 }
 
 /// FFT domain header — fixed prefix of every gnark proving key.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Domain {
     pub cardinality: u64,
     pub cardinality_inv: Fr,
@@ -41,7 +41,7 @@ pub struct Domain {
 }
 
 /// Per-commitment Pedersen proving key (one entry per gnark commitment).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PedersenProvingKey {
     pub basis: Vec<G1Affine>,
     pub basis_exp_sigma: Vec<G1Affine>,

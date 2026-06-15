@@ -17,7 +17,7 @@ parallel = [
     "ark-std/parallel",
 ]
 local-curve = ["dep:bn254-multiplier"]
-bench = ["dep:web-sys", "dep:console_error_panic_hook"]
+bench = ["dep:console_error_panic_hook"]
 
 [dependencies]
 acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.18", features = ["bn254"] }
@@ -44,11 +44,18 @@ serde_json = "1"
 sha2 = { version = "0.10", default-features = false }
 thiserror = "2"
 wasm-bindgen = "0.2"
-web-sys = { version = "0.3", optional = true, features = ["Performance", "Window"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen-rayon = { version = "1.2", optional = true }
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = [
+    "Performance",
+    "Window",
+    "Response",
+    "ReadableStream",
+    "ReadableStreamDefaultReader",
+] }
 
 # Host-only: keeps the Solana toolchain out of wasm builds.
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

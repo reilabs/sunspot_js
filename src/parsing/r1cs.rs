@@ -1,4 +1,5 @@
 //! Gnark constraint-system (`*.ccs`) parser
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 use super::decode_intcomp::IntcompWord;

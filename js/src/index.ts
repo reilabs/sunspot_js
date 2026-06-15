@@ -34,6 +34,8 @@ type WasmModule = {
   R1CS: new (bytes: Uint8Array) => Wasm.R1CS;
   ProvingKey: (new (bytes: Uint8Array) => Wasm.ProvingKey) & {
     new_unchecked: (bytes: Uint8Array) => Wasm.ProvingKey;
+    from_response: (res: Response) => Promise<Wasm.ProvingKey>;
+    from_response_unchecked: (res: Response) => Promise<Wasm.ProvingKey>;
   };
   prove: (r1cs: Wasm.R1CS, w: Wasm.GnarkWitness, pk: Wasm.ProvingKey) => Wasm.Proof;
 };
@@ -115,12 +117,26 @@ export class ProvingKey {
     this.inner = new (requireMod().ProvingKey)(bytes);
   }
   static new_unchecked(bytes: Uint8Array): ProvingKey {
-    const w = Object.create(ProvingKey.prototype) as { inner: Wasm.ProvingKey };
-    w.inner = requireMod().ProvingKey.new_unchecked(bytes);
-    return w as ProvingKey;
+    return wrap(requireMod().ProvingKey.new_unchecked(bytes));
+  }
+  /**
+   * Stream a proving key directly from a `fetch()` response.
+   */
+  static async from(src: Response | Promise<Response>): Promise<ProvingKey> {
+    return wrap(await requireMod().ProvingKey.from_response(await src));
+  }
+  /** Same as {@link from} but skips on-curve checks. */
+  static async from_unchecked(src: Response | Promise<Response>): Promise<ProvingKey> {
+    return wrap(await requireMod().ProvingKey.from_response_unchecked(await src));
   }
   free(): void { this.inner.free(); }
   [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
+}
+
+function wrap(inner: Wasm.ProvingKey): ProvingKey {
+  const w = Object.create(ProvingKey.prototype) as { inner: Wasm.ProvingKey };
+  w.inner = inner;
+  return w as ProvingKey;
 }
 
 export class Proof {

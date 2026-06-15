@@ -1,19 +1,21 @@
 //! Gnark Groth16 proving-key (`*.pk`) parser.
-
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 use crate::parsing::utils::{
-    FIELD_BYTES, read_bool_vec, read_fr, read_g1, read_g1_vec, read_g2, read_g2_vec, take,
+    bit_reverse_to_natural, kept_indices, read_bool_vec, read_domain, read_g1, read_g1_vec,
+    read_g2, read_g2_vec,
 };
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::{PedersenProvingKey, ProvingKey, types::Domain};
+use crate::{PedersenProvingKey, ProvingKey};
 
 use super::ParseError;
 
 impl ProvingKey {
     /// Loads a gnark proving key from disk.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load(path: impl AsRef<Path>) -> Result<Self, ParseError> {
         let bytes = std::fs::read(path)?;
         Self::from_bytes_checked(&bytes)
@@ -98,62 +100,9 @@ impl ProvingKey {
     }
 }
 
-fn kept_indices(infinity: &[bool]) -> Vec<u32> {
-    let kept = infinity.iter().filter(|b| !**b).count();
-    let mut out = Vec::with_capacity(kept);
-    for (i, &inf) in infinity.iter().enumerate() {
-        if !inf {
-            out.push(i as u32);
-        }
-    }
-    out
-}
-
-fn read_domain(r: &mut &[u8]) -> Result<Domain, ParseError> {
-    let cardinality = r.read_u64::<BigEndian>()?;
-    let cardinality_inv = read_fr(take(r, FIELD_BYTES)?);
-    let generator = read_fr(take(r, FIELD_BYTES)?);
-    let generator_inv = read_fr(take(r, FIELD_BYTES)?);
-    let fr_multiplicative_gen = read_fr(take(r, FIELD_BYTES)?);
-    let fr_multiplicative_gen_inv = read_fr(take(r, FIELD_BYTES)?);
-    let with_precompute = r.read_u8()? != 0;
-    Ok(Domain {
-        cardinality,
-        cardinality_inv,
-        generator,
-        generator_inv,
-        fr_multiplicative_gen,
-        fr_multiplicative_gen_inv,
-        with_precompute,
-    })
-}
-
 fn read_pedersen_pk(r: &mut &[u8], check_points: bool) -> Result<PedersenProvingKey, ParseError> {
     Ok(PedersenProvingKey {
         basis: read_g1_vec(r, check_points)?,
         basis_exp_sigma: read_g1_vec(r, check_points)?,
     })
-}
-
-/// Apply the inverse of a `log₂(domain_size)`-bit bit-reversal permutation,
-/// in place. `domain_size` must be a power of two ≥ `v.len()`. When
-/// `v.len() == domain_size - 1`, the fixed point `br(N−1) = N−1` falls
-/// outside the array — every swap pair stays in-bounds, so we don't need
-/// to pad. (The N−1 case is exactly how `pk.g1_z` is shaped.)
-fn bit_reverse_to_natural<T>(v: &mut [T], domain_size: usize) {
-    if domain_size <= 1 {
-        return;
-    }
-    debug_assert!(
-        domain_size.is_power_of_two(),
-        "bit_reverse_to_natural: domain_size must be 2^k"
-    );
-    debug_assert!(v.len() <= domain_size);
-    let log_n = domain_size.trailing_zeros();
-    for i in 0..v.len() {
-        let j = ((i as u64).reverse_bits() >> (64 - log_n)) as usize;
-        if i < j && j < v.len() {
-            v.swap(i, j);
-        }
-    }
 }

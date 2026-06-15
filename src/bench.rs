@@ -5,9 +5,9 @@
 //! wasm-pack build --release --target web --features bench
 //! ```
 
-use crate::curve::{Fr, G1Affine, G1Projective, G2Projective};
+use crate::curve::{Fr, G1Affine, G1Projective};
 use ark_ec::{AffineRepr, CurveGroup};
-use ark_ff::{One, PrimeField, Zero};
+use ark_ff::{One, Zero};
 use std::hint::black_box;
 use wasm_bindgen::prelude::*;
 
@@ -116,8 +116,45 @@ pub fn bench_parse_r1cs(bytes: &[u8], iterations: u32) -> Result<BenchResult, Js
     }))
 }
 
+/// Chunk size for the streaming-parse benches.
+const PARSE_STREAM_CHUNK: usize = 64 * 1024;
+
+fn parse_pk_streaming(
+    bytes: &[u8],
+    check_points: bool,
+) -> Result<ProvingKey, crate::parsing::ParseError> {
+    let mut parser = ProvingKey::streaming_parser(check_points);
+    for chunk in bytes.chunks(PARSE_STREAM_CHUNK) {
+        parser.feed(chunk)?;
+    }
+    parser.finish()
+}
+
 #[wasm_bindgen]
 pub fn bench_parse_proving_key(bytes: &[u8], iterations: u32) -> Result<BenchResult, JsError> {
+    parse_pk_streaming(bytes, true).map_err(err)?;
+    Ok(run(iterations, || {
+        parse_pk_streaming(black_box(bytes), true).unwrap()
+    }))
+}
+
+#[wasm_bindgen]
+pub fn bench_parse_proving_key_unchecked(
+    bytes: &[u8],
+    iterations: u32,
+) -> Result<BenchResult, JsError> {
+    parse_pk_streaming(bytes, false).map_err(err)?;
+    Ok(run(iterations, || {
+        parse_pk_streaming(black_box(bytes), false).unwrap()
+    }))
+}
+
+/// Batched-parse baseline.
+#[wasm_bindgen]
+pub fn bench_parse_proving_key_batched(
+    bytes: &[u8],
+    iterations: u32,
+) -> Result<BenchResult, JsError> {
     ProvingKey::from_bytes_checked(bytes).map_err(err)?;
     Ok(run(iterations, || {
         ProvingKey::from_bytes_checked(black_box(bytes)).unwrap()
@@ -125,7 +162,7 @@ pub fn bench_parse_proving_key(bytes: &[u8], iterations: u32) -> Result<BenchRes
 }
 
 #[wasm_bindgen]
-pub fn bench_parse_proving_key_unchecked(
+pub fn bench_parse_proving_key_unchecked_batched(
     bytes: &[u8],
     iterations: u32,
 ) -> Result<BenchResult, JsError> {

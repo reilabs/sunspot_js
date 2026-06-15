@@ -5,7 +5,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-use crate::{curve::*, parsing::ParseError};
+use crate::{curve::*, parsing::ParseError, types::Domain};
 
 pub(super) fn read_fr(buf: &[u8]) -> Fr {
     // 4 BE u64 limbs, MSB first in file → little-endian limb order [l0,l1,l2,l3]
@@ -32,66 +32,59 @@ pub(super) fn read_g2(r: &mut &[u8], check_point: bool) -> Result<G2Affine, Pars
 pub(super) fn read_g1_vec(r: &mut &[u8], check_points: bool) -> Result<Vec<G1Affine>, ParseError> {
     let len = r.read_u32::<BigEndian>()? as usize;
     let buf = take(r, len * G1_AFFINE_BYTES)?;
-    read_affine_vec(
-        buf,
-        len,
-        G1_AFFINE_BYTES,
-        G1Affine::identity,
-        |b| g1_pair_from_uncompressed(&b[..G1_AFFINE_BYTES], &b[G1_AFFINE_BYTES..], check_points),
-        |b| g1_from_uncompressed(b, check_points),
-    )
+    let mut out = Vec::with_capacity(len);
+    decode_g1_run(buf, len, check_points, &mut out)?;
+    Ok(out)
 }
 
 pub(super) fn read_g2_vec(r: &mut &[u8], check_points: bool) -> Result<Vec<G2Affine>, ParseError> {
     let len = r.read_u32::<BigEndian>()? as usize;
     let buf = take(r, len * G2_AFFINE_BYTES)?;
-    read_affine_vec(
-        buf,
-        len,
-        G2_AFFINE_BYTES,
-        G2Affine::identity,
-        |b| g2_pair_from_uncompressed(&b[..G2_AFFINE_BYTES], &b[G2_AFFINE_BYTES..], check_points),
-        |b| g2_from_uncompressed(b, check_points),
-    )
+    let mut out = Vec::with_capacity(len);
+    decode_g2_run(buf, len, check_points, &mut out)?;
+    Ok(out)
 }
 
-/// Generic pair-chunked parallel decoder. Processes pairs of consecutive
-/// affine points through `pair_decode` so the per-point Fq ops batch via
+/// Pair-chunked parallel decoder. Processes pairs of consecutive affine
+/// points through `pair_decode` so the per-point Fq ops batch via
 /// `simd_mul_fq`; the leftover odd point (when `len` is odd) goes through
 /// the scalar `single_decode`.
-pub(super) fn read_affine_vec<P, FPair, FSingle>(
+pub(super) fn decode_affine_run<P, FPair, FSingle>(
     buf: &[u8],
     len: usize,
     stride: usize,
     identity: fn() -> P,
     pair_decode: FPair,
     single_decode: FSingle,
-) -> Result<Vec<P>, ParseError>
+    out: &mut Vec<P>,
+) -> Result<(), ParseError>
 where
     P: Clone + Send + Sync,
     FPair: Fn(&[u8]) -> Result<(P, P), ParseError> + Sync,
     FSingle: Fn(&[u8]) -> Result<P, ParseError>,
 {
     if len == 0 {
-        return Ok(Vec::new());
+        return Ok(());
     }
-    let mut out = vec![identity(); len];
+    let start = out.len();
+    out.resize(start + len, identity());
+    let slots = &mut out[start..];
     let pair_count = len / 2;
     let pair_stride = 2 * stride;
 
     #[cfg(feature = "parallel")]
-    let (slots, in_bufs) = (
-        out[..2 * pair_count].par_chunks_exact_mut(2),
+    let (slot_chunks, in_bufs) = (
+        slots[..2 * pair_count].par_chunks_exact_mut(2),
         buf[..pair_count * pair_stride].par_chunks_exact(pair_stride),
     );
 
     #[cfg(not(feature = "parallel"))]
-    let (slots, in_bufs) = (
-        out[..2 * pair_count].chunks_exact_mut(2),
+    let (slot_chunks, in_bufs) = (
+        slots[..2 * pair_count].chunks_exact_mut(2),
         buf[..pair_count * pair_stride].chunks_exact(pair_stride),
     );
 
-    slots
+    slot_chunks
         .zip(in_bufs)
         .try_for_each(|(slot, in_buf)| -> Result<(), ParseError> {
             let (p0, p1) = pair_decode(in_buf)?;
@@ -101,9 +94,43 @@ where
         })?;
     if len & 1 == 1 {
         let tail = 2 * pair_count * stride;
-        out[len - 1] = single_decode(&buf[tail..tail + stride])?;
+        slots[len - 1] = single_decode(&buf[tail..tail + stride])?;
     }
-    Ok(out)
+    Ok(())
+}
+
+pub(super) fn decode_g1_run(
+    buf: &[u8],
+    len: usize,
+    check_points: bool,
+    out: &mut Vec<G1Affine>,
+) -> Result<(), ParseError> {
+    decode_affine_run(
+        buf,
+        len,
+        G1_AFFINE_BYTES,
+        G1Affine::identity,
+        |b| g1_pair_from_uncompressed(&b[..G1_AFFINE_BYTES], &b[G1_AFFINE_BYTES..], check_points),
+        |b| g1_from_uncompressed(b, check_points),
+        out,
+    )
+}
+
+pub(super) fn decode_g2_run(
+    buf: &[u8],
+    len: usize,
+    check_points: bool,
+    out: &mut Vec<G2Affine>,
+) -> Result<(), ParseError> {
+    decode_affine_run(
+        buf,
+        len,
+        G2_AFFINE_BYTES,
+        G2Affine::identity,
+        |b| g2_pair_from_uncompressed(&b[..G2_AFFINE_BYTES], &b[G2_AFFINE_BYTES..], check_points),
+        |b| g2_from_uncompressed(b, check_points),
+        out,
+    )
 }
 
 pub(super) fn read_bool_vec(r: &mut &[u8], n: usize) -> Result<Vec<bool>, ParseError> {
@@ -113,7 +140,7 @@ pub(super) fn read_bool_vec(r: &mut &[u8], n: usize) -> Result<Vec<bool>, ParseE
 
 // Helpers
 
-fn g1_from_uncompressed(buf: &[u8], check_point: bool) -> Result<G1Affine, ParseError> {
+pub(super) fn g1_from_uncompressed(buf: &[u8], check_point: bool) -> Result<G1Affine, ParseError> {
     let m_data = buf[0] & M_MASK;
     if m_data == M_COMPRESSED_INFINITY {
         return Ok(G1Affine::identity());
@@ -144,7 +171,7 @@ fn g1_from_uncompressed(buf: &[u8], check_point: bool) -> Result<G1Affine, Parse
 /// batched across the two points), and the on-curve check `y² ?= x³ + b`
 /// runs as 3× `simd_mul_fq` (`y²`, `x²`, `x³`), each pairing the two points.
 /// Net: 5 SIMD ops vs ~10 scalar Fq muls per pair.
-fn g1_pair_from_uncompressed(
+pub(super) fn g1_pair_from_uncompressed(
     buf_a: &[u8],
     buf_b: &[u8],
     check_points: bool,
@@ -194,7 +221,7 @@ fn g1_pair_from_uncompressed(
     }
 }
 
-fn g2_from_uncompressed(buf: &[u8], check_point: bool) -> Result<G2Affine, ParseError> {
+pub(super) fn g2_from_uncompressed(buf: &[u8], check_point: bool) -> Result<G2Affine, ParseError> {
     let m_data = buf[0] & M_MASK;
     if m_data == M_COMPRESSED_INFINITY {
         return Ok(G2Affine::identity());
@@ -230,7 +257,7 @@ fn g2_from_uncompressed(buf: &[u8], check_point: bool) -> Result<G2Affine, Parse
 /// single `simd_mul_fq`. The expensive subgroup check is preserved via an
 /// explicit `is_in_correct_subgroup_assuming_on_curve` call so this
 /// refactor doesn't change the security posture.
-fn g2_pair_from_uncompressed(
+pub(super) fn g2_pair_from_uncompressed(
     buf_a: &[u8],
     buf_b: &[u8],
     check_points: bool,
@@ -382,4 +409,54 @@ pub(super) fn take<'a>(r: &mut &'a [u8], n: usize) -> Result<&'a [u8], ParseErro
     let (head, tail) = r.split_at(n);
     *r = tail;
     Ok(head)
+}
+
+pub(super) fn kept_indices(infinity: &[bool]) -> Vec<u32> {
+    infinity
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &b)| (!b).then_some(i as u32))
+        .collect()
+}
+
+/// Apply the inverse of a `log₂(domain_size)`-bit bit-reversal permutation,
+/// in place. `domain_size` must be a power of two ≥ `v.len()`. When
+/// `v.len() == domain_size - 1`, the fixed point `br(N−1) = N−1` falls
+/// outside the array — every swap pair stays in-bounds, so we don't need
+/// to pad. (The N−1 case is exactly how `pk.g1_z` is shaped.)
+pub(super) fn bit_reverse_to_natural<T>(v: &mut [T], domain_size: usize) {
+    if domain_size <= 1 {
+        return;
+    }
+    debug_assert!(
+        domain_size.is_power_of_two(),
+        "bit_reverse_to_natural: domain_size must be 2^k"
+    );
+    debug_assert!(v.len() <= domain_size);
+    let log_n = domain_size.trailing_zeros();
+    for i in 0..v.len() {
+        let j = ((i as u64).reverse_bits() >> (64 - log_n)) as usize;
+        if i < j && j < v.len() {
+            v.swap(i, j);
+        }
+    }
+}
+
+pub(super) fn read_domain(r: &mut &[u8]) -> Result<Domain, ParseError> {
+    let cardinality = r.read_u64::<BigEndian>()?;
+    let cardinality_inv = read_fr(take(r, FIELD_BYTES)?);
+    let generator = read_fr(take(r, FIELD_BYTES)?);
+    let generator_inv = read_fr(take(r, FIELD_BYTES)?);
+    let fr_multiplicative_gen = read_fr(take(r, FIELD_BYTES)?);
+    let fr_multiplicative_gen_inv = read_fr(take(r, FIELD_BYTES)?);
+    let with_precompute = r.read_u8()? != 0;
+    Ok(Domain {
+        cardinality,
+        cardinality_inv,
+        generator,
+        generator_inv,
+        fr_multiplicative_gen,
+        fr_multiplicative_gen_inv,
+        with_precompute,
+    })
 }

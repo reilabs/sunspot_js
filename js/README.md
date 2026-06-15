@@ -79,7 +79,9 @@ const gnarkWitness = new GnarkWitness(acirJson, witness);
 
 // 4. Load the gnark constraint system + proving key.
 const r1cs = new R1CS(new Uint8Array(await (await fetch('./circuit.ccs')).arrayBuffer()));
-const pk   = new ProvingKey(new Uint8Array(await (await fetch('./circuit.pk')).arrayBuffer()));
+// Stream-parse the proving key directly from the response — avoids a full
+// in-memory copy for large keys. Equivalent to `new ProvingKey(bytes)`.
+const pk   = await ProvingKey.from(fetch('./circuit.pk'));
 
 // 5. Prove. Result is a gnark Proof.WriteRawTo-compatible byte blob.
 const proof = prove(r1cs, gnarkWitness, pk);
@@ -110,9 +112,11 @@ import { init, prove } from '@reilabs/sunspot_js/sisd-st'; // scalar fallback, s
 
 - `init(options?)` — initialise wasm (and rayon thread pool, in threaded variants).
 - `getVariant()` — returns the build chosen by `init()` (default entry only), or `null` before init resolves.
-- `class GnarkWitness(acirJsonBytes, witnessStackBytes)` — build the gnark-ordered witness.
+- `class GnarkWitness(acirJsonBytes, witnessStackBytes)` — build the gnark-ordered witness. Exposes `privateBytes()` and `publicBytes()` (concatenated 32-byte big-endian limbs).
 - `class R1CS(bytes)` — parse a gnark `*.ccs` constraint system.
 - `class ProvingKey(bytes)` — parse a gnark Groth16 `*.pk` file.
+  - `ProvingKey.from(response)` — stream-parse directly from a `fetch()` response, avoiding a full in-memory copy.
+  - `ProvingKey.fromUnchecked(response)` / `ProvingKey.newUnchecked(bytes)` — skip on-curve checks. Only safe for trusted keys.
 - `class Proof` — `asBytes()`, `arBytes()`, `bsBytes()`, `krsBytes()`, `commitmentsBytes()`, `commitmentPokBytes()`, `nbCommitments()`, `isValid()`.
 - `prove(r1cs, witness, pk): Proof` — solve + prove in one shot.
 

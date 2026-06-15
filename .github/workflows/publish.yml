@@ -1,0 +1,123 @@
+name: Publish @reilabs/sunspot_js
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'js/package.json'
+      - 'src/**'
+      - 'js/src/**'
+      - 'js/scripts/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/publish.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'js/package.json'
+      - 'src/**'
+      - 'js/src/**'
+      - 'js/scripts/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/publish.yml'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Run npm publish with --dry-run (does not upload)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry-run == false)) && 'npm' || '' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org/'
+          cache: yarn
+          cache-dependency-path: js/yarn.lock
+
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae  # v2
+
+      # OIDC trusted-publisher support requires npm >= 11.5.1; Node 20 LTS
+      # ships with npm 10.x.
+      - name: Upgrade npm
+        run: npm install --global npm@latest
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Install wasm-opt (binaryen)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+
+      - name: Install JS deps
+        working-directory: js
+        run: yarn install --frozen-lockfile
+
+      # Skip without failing if this version is already on npm 
+      - name: Check whether this version is already published
+        id: check
+        run: |
+          PKG=$(node -p "require('./js/package.json').version")
+          echo "version=$PKG" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif npm view "@reilabs/sunspot_js@$PKG" version --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::@reilabs/sunspot_js@$PKG already on npm — nothing to do"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Dry-run policy:
+      #   pull_request      → always dry-run (verifies build, never publishes)
+      #   push (main)       → real publish
+      #   workflow_dispatch → honour the `dry-run` input (default: true)
+      - name: Decide dry-run mode
+        id: mode
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request)     echo "dry-run=true"  >> "$GITHUB_OUTPUT" ;;
+            push)             echo "dry-run=false" >> "$GITHUB_OUTPUT" ;;
+            workflow_dispatch) echo "dry-run=${{ inputs.dry-run }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Build wasm + ts
+        if: steps.check.outputs.skip == 'false'
+        working-directory: js
+        run: yarn build
+
+      - name: Dry-run pack
+        if: steps.check.outputs.skip == 'false'
+        working-directory: js
+        run: npm pack --dry-run
+
+      # `--provenance` requires `id-token: write`, which fork PRs don't get;
+      # safer to skip it during dry-runs (no attestation is recorded anyway).
+      - name: Publish
+        if: steps.check.outputs.skip == 'false'
+        working-directory: js
+        run: |
+          if [ "${{ steps.mode.outputs.dry-run }}" = "true" ]; then
+            npm publish --access public --dry-run --ignore-scripts
+          else
+            npm publish --access public --provenance --ignore-scripts
+          fi

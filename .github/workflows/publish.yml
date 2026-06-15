@@ -103,7 +103,7 @@ jobs:
       - name: Dry-run pack
         if: steps.check.outputs.skip == 'false'
         working-directory: js
-        run: npm pack --dry-run
+        run: npm pack --dry-run --ignore-scripts
 
       # `--provenance` requires `id-token: write`, which fork PRs don't get;
       # safer to skip it during dry-runs (no attestation is recorded anyway).

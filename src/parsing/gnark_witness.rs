@@ -19,6 +19,22 @@ impl GnarkWitness {
         witness_stack_bytes: &[u8],
     ) -> Result<GnarkWitness, ParseError> {
         let program = parse_acir_program(acir_json_bytes)?;
+        Self::from_program(program, witness_stack_bytes)
+    }
+
+    /// Build directly from the base64-encoded ACIR bytecode.
+    pub fn from_bytecode(
+        bytecode_b64: &str,
+        witness_stack_bytes: &[u8],
+    ) -> Result<GnarkWitness, ParseError> {
+        let program = parse_acir_bytecode(bytecode_b64)?;
+        Self::from_program(program, witness_stack_bytes)
+    }
+
+    fn from_program(
+        program: Program<FieldElement>,
+        witness_stack_bytes: &[u8],
+    ) -> Result<GnarkWitness, ParseError> {
         let witness_stack = WitnessStack::<FieldElement>::deserialize(witness_stack_bytes)
             .map_err(|e| ParseError::Witness(format!("deserialize witness stack: {e}")))?;
         Self::get_witness(program, witness_stack)
@@ -90,11 +106,17 @@ impl GnarkWitness {
 /// deserializes it into a typed [`Program`].
 fn parse_acir_program(json_bytes: &[u8]) -> Result<Program<FieldElement>, ParseError> {
     let value: serde_json::Value = serde_json::from_slice(json_bytes)?;
-    let bytecode_b64 = value
+    let bytecode = value
         .get("bytecode")
         .and_then(|v| v.as_str())
         .ok_or_else(|| ParseError::Acir("missing bytecode".into()))?;
-    let bytecode = STANDARD.decode(bytecode_b64)?;
+    parse_acir_bytecode(bytecode)
+}
+
+/// Base64-decode the bytecode field and deserialize it into a typed
+/// [`Program`].
+fn parse_acir_bytecode(bytecode: &str) -> Result<Program<FieldElement>, ParseError> {
+    let bytecode = STANDARD.decode(bytecode)?;
     Program::<FieldElement>::deserialize_program(&bytecode)
         .map_err(|e| ParseError::Acir(format!("deserialize bytecode: {e}")))
 }

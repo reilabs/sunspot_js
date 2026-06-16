@@ -58,34 +58,22 @@ back to a single-threaded build.
 
 ## Usage
 
+
 ```ts
-import { init, R1CS, ProvingKey, GnarkWitness, prove, Noir } from '@reilabs/sunspot_js';
-import type { CompiledCircuit, InputMap } from '@reilabs/sunspot_js';
+import { init, ZKey, fullProve } from '@reilabs/sunspot_js';
+import type { Circuit, InputMap } from '@reilabs/sunspot_js';
 
 // 1. Initialise wasm + thread pool.
 await init();
 // optional: await init({ threads: 4, wasmUrl: new URL('./sunspot_wasm_bg.wasm', import.meta.url) });
 
-// 2. Generate the witness from a Noir compiled artifact.
-const circuit: CompiledCircuit = await fetch('./circuit.json').then(r => r.json());
+// 2. Load the proving key + R1CS into a ZKey in parallel. 
+const circuit: Circuit = await fetch('./circuit.json').then(r => r.json());
+const zkey = await ZKey.from(fetch('./circuit.pk'), fetch('./circuit.ccs'));
+
+// 3.  Prove.
 const inputs: InputMap = { x: '0x1', y: '0x2' };
-
-const noir = new Noir(circuit);
-const { witness } = await noir.execute(inputs);   // gzipped witness stack
-
-// 3. Build the gnark-ordered witness from the ACIR + witness stack.
-const acirJson = new Uint8Array(await (await fetch('./circuit.json')).arrayBuffer());
-const gnarkWitness = new GnarkWitness(acirJson, witness);
-
-// 4. Load the gnark constraint system + proving key.
-const r1cs = new R1CS(new Uint8Array(await (await fetch('./circuit.ccs')).arrayBuffer()));
-// Stream-parse the proving key directly from the response — avoids a full
-// in-memory copy for large keys. Equivalent to `new ProvingKey(bytes)`.
-const pk   = await ProvingKey.from(fetch('./circuit.pk'));
-
-// 5. Prove. Result is a gnark Proof.WriteRawTo-compatible byte blob.
-const proof = prove(r1cs, gnarkWitness, pk);
-const wireBytes = proof.asBytes();    // round-trips with gnark's Proof.ReadFrom
+const proof = await prove(inputs, circuit, zkey);
 ```
 
 Pinning a specific build is just an import-path change — the API is
@@ -112,18 +100,21 @@ import { init, prove } from '@reilabs/sunspot_js/sisd-st'; // scalar fallback, s
 
 - `init(options?)` — initialise wasm (and rayon thread pool, in threaded variants).
 - `getVariant()` — returns the build chosen by `init()` (default entry only), or `null` before init resolves.
-- `class GnarkWitness(acirJsonBytes, witnessStackBytes)` — build the gnark-ordered witness. Exposes `privateBytes()` and `publicBytes()` (concatenated 32-byte big-endian limbs).
 - `class R1CS(bytes)` — parse a gnark `*.ccs` constraint system.
-- `class ProvingKey(bytes)` — parse a gnark Groth16 `*.pk` file.
-  - `ProvingKey.from(response)` — stream-parse directly from a `fetch()` response, avoiding a full in-memory copy.
-  - `ProvingKey.fromUnchecked(response)` / `ProvingKey.newUnchecked(bytes)` — skip on-curve checks. Only safe for trusted keys.
+  - `R1CS.from(response)` — load directly from a `fetch()` response.
+- `class ProvingKey`:
+  - `ProvingKey.from(response)` / `ProvingKey.fromUnchecked(response)` — stream-parse directly from a `fetch()` response. Only use `fromUnchecked()` for trusted keys
+- `class ZKey(pk, r1cs)` — bundles a proving key and R1CS.
+  - `ZKey.from(pkResponse, r1csResponse)` — load both from `fetch()` responses.
+  - `ZKey.fromUnchecked(pkResponse, r1csResponse)` — same but skips on-curve checks on the PK. Only safe for trusted keys.
+- `class Witness(circuit, witnessStackBytes)` — build the gnark-ordered partial witness from a Noir `CompiledCircuit` and the `Noir#execute(...).witness` witness map. Exposes `privateBytes()` and `publicBytes()` (concatenated 32-byte big-endian limbs).
 - `class Proof` — `asBytes()`, `arBytes()`, `bsBytes()`, `krsBytes()`, `commitmentsBytes()`, `commitmentPokBytes()`, `nbCommitments()`, `isValid()`.
-- `prove(r1cs, witness, pk): Proof` — solve + prove in one shot.
+- `prove(input, circuit, zkey): Promise<Proof>` — witness-gen + prove in one call.
 
 Re-exported from `@noir-lang/noir_js`:
 
 - `class Noir(circuit)` — wraps witness generation. `Noir#execute(inputs, foreignCallHandler?)`.
-- Types: `CompiledCircuit`, `InputMap`, `WitnessMap`, `ForeignCallHandler`, `ForeignCallInput`, `ForeignCallOutput`, `ErrorWithPayload`.
+- Types: `Circuit` , `InputMap`, `WitnessMap`, `ForeignCallHandler`, `ForeignCallInput`, `ForeignCallOutput`, `ErrorWithPayload`.
 
 ## Building from source
 

@@ -1,5 +1,5 @@
 import wasmInit, {
-  GnarkWitness,
+  Witness,
   R1CS,
   ProvingKey,
   Proof,
@@ -7,7 +7,7 @@ import wasmInit, {
 } from '../wasm-sisd-st/sunspot_wasm.js';
 import { makeStInit } from './_init.js';
 
-export { GnarkWitness, R1CS, ProvingKey, Proof, prove };
+export { Witness, R1CS, ProvingKey, Proof, prove };
 export * from './noir.js';
 export type { StInitOptions as InitOptions } from './_init.js';
 

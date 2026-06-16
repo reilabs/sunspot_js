@@ -26,19 +26,16 @@ fn err(e: impl std::fmt::Display) -> JsError {
 }
 
 #[wasm_bindgen]
-pub struct GnarkWitness(types::GnarkWitness);
+pub struct Witness(types::GnarkWitness);
 
 #[wasm_bindgen]
-impl GnarkWitness {
-    /// Build the gnark-ordered witness vector from a Noir ACIR JSON artifact
+impl Witness {
+    /// Build the gnark-ordered witness vector from ACIR bytecode
     /// and a gzipped witness-stack (`*.gz`) blob.
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        acir_json_bytes: &[u8],
-        witness_stack_bytes: &[u8],
-    ) -> Result<GnarkWitness, JsError> {
-        types::GnarkWitness::from_bytes(acir_json_bytes, witness_stack_bytes)
-            .map(GnarkWitness)
+    pub fn new(bytecode: &str, witness_stack_bytes: &[u8]) -> Result<Witness, JsError> {
+        types::GnarkWitness::from_bytecode(bytecode, witness_stack_bytes)
+            .map(Witness)
             .map_err(err)
     }
 
@@ -213,7 +210,7 @@ impl Proof {
 /// the two steps separately via `bench_solve` and `bench_prove` when wanting
 /// finer-grained timing.
 #[wasm_bindgen]
-pub fn prove(r1cs: &R1CS, witness: &GnarkWitness, pk: &ProvingKey) -> Result<Proof, JsError> {
+pub fn prove(r1cs: &R1CS, witness: &Witness, pk: &ProvingKey) -> Result<Proof, JsError> {
     let commitment_keys = if pk.0.commitment_keys.is_empty() {
         None
     } else {

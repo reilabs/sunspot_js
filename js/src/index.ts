@@ -1,6 +1,6 @@
 // Auto-detecting entry. Probes browser features at `init()` time, picks the
-// fastest viable wasm build, and exposes the same surface as the pinned
-// variants through thin wrapper classes.
+// fastest viable wasm build, and exposes `prove(r1cs, witness, pk)` over
+// Noir artifacts and gnark-format proving keys.
 //
 // Decision matrix:
 //   relaxed-SIMD + crossOriginIsolated → wasm-simd-mt   (fastest)
@@ -12,6 +12,7 @@
 // support code-splitting only ship the build that the target browser
 // actually uses.
 
+import { Noir, type CompiledCircuit, type InputMap } from '@noir-lang/noir_js';
 import type * as Wasm from '../wasm-simd-mt/sunspot_wasm.js';
 import { detectFeatures, pickVariant, type Variant } from './_probe_features.js';
 
@@ -30,14 +31,13 @@ export interface InitOptions {
 type WasmModule = {
   default: (input?: { module_or_path: string | URL | Request } | undefined) => Promise<unknown>;
   initThreadPool?: (n: number) => Promise<unknown>;
-  GnarkWitness: new (acir: Uint8Array, witness: Uint8Array) => Wasm.GnarkWitness;
+  Witness: new (bytecodeB64: string, witness: Uint8Array) => Wasm.Witness;
   R1CS: new (bytes: Uint8Array) => Wasm.R1CS;
-  ProvingKey: (new (bytes: Uint8Array) => Wasm.ProvingKey) & {
-    new_unchecked: (bytes: Uint8Array) => Wasm.ProvingKey;
+  ProvingKey: {
     from_response: (res: Response) => Promise<Wasm.ProvingKey>;
     from_response_unchecked: (res: Response) => Promise<Wasm.ProvingKey>;
   };
-  prove: (r1cs: Wasm.R1CS, w: Wasm.GnarkWitness, pk: Wasm.ProvingKey) => Wasm.Proof;
+  prove: (r1cs: Wasm.R1CS, w: Wasm.Witness, pk: Wasm.ProvingKey) => Wasm.Proof;
 };
 
 let mod: WasmModule | null = null;
@@ -91,21 +91,16 @@ function requireMod(): WasmModule {
   return mod;
 }
 
-export class GnarkWitness {
-  /** @internal */ readonly inner: Wasm.GnarkWitness;
-  constructor(acirJsonBytes: Uint8Array, witnessStackBytes: Uint8Array) {
-    this.inner = new (requireMod().GnarkWitness)(acirJsonBytes, witnessStackBytes);
-  }
-  privateBytes(): Uint8Array { return this.inner.private_bytes(); }
-  publicBytes(): Uint8Array { return this.inner.public_bytes(); }
-  free(): void { this.inner.free(); }
-  [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
-}
-
 export class R1CS {
   /** @internal */ readonly inner: Wasm.R1CS;
   constructor(bytes: Uint8Array) {
     this.inner = new (requireMod().R1CS)(bytes);
+  }
+  /** Load directly from a `fetch()` response. */
+  static async from(src: Response | Promise<Response>): Promise<R1CS> {
+    const res = await src;
+    if (!res.ok) throw new Error(`fetch failed: ${res.status} ${res.statusText}`);
+    return new R1CS(new Uint8Array(await res.arrayBuffer()));
   }
   free(): void { this.inner.free(); }
   [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
@@ -113,32 +108,79 @@ export class R1CS {
 
 export class ProvingKey {
   /** @internal */ readonly inner: Wasm.ProvingKey;
-  constructor(bytes: Uint8Array) {
-    this.inner = new (requireMod().ProvingKey)(bytes);
+  /** @internal */ private constructor(inner: Wasm.ProvingKey) {
+    this.inner = inner;
   }
-  static newUnchecked(bytes: Uint8Array): ProvingKey {
-    return wrap(requireMod().ProvingKey.new_unchecked(bytes));
-  }
-  /**
-   * Stream a proving key directly from a `fetch()` response.
-   */
+  /** Stream a proving key directly from a `fetch()` response. */
   static async from(src: Response | Promise<Response>): Promise<ProvingKey> {
-    return wrap(await requireMod().ProvingKey.from_response(await src));
+    return new ProvingKey(await requireMod().ProvingKey.from_response(await src));
   }
-  /** Same as {@link from} but skips on-curve checks. */
+  /** Same as {@link from} but skips on-curve checks. Only safe for trusted keys. */
   static async fromUnchecked(src: Response | Promise<Response>): Promise<ProvingKey> {
-    return wrap(await requireMod().ProvingKey.from_response_unchecked(await src));
+    return new ProvingKey(await requireMod().ProvingKey.from_response_unchecked(await src));
   }
   free(): void { this.inner.free(); }
   [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
 }
 
-function wrap(inner: Wasm.ProvingKey): ProvingKey {
-  const w = Object.create(ProvingKey.prototype) as { inner: Wasm.ProvingKey };
-  w.inner = inner;
-  return w as ProvingKey;
+/**
+ * Bundles a proving key and R1CS.
+ */
+export class ZKey {
+  /** @internal */ readonly pk: ProvingKey;
+  /** @internal */ readonly r1cs: R1CS;
+  constructor(pk: ProvingKey, r1cs: R1CS) {
+    this.pk = pk;
+    this.r1cs = r1cs;
+  }
+  /**
+   * Load proving key + R1CS in parallel from two `fetch()` responses.
+   * The PK is stream-parsed; the R1CS is buffered then parsed.
+   */
+  static async from(
+    pkSrc: Response | Promise<Response>,
+    r1csSrc: Response | Promise<Response>,
+  ): Promise<ZKey> {
+    const [pk, r1cs] = await Promise.all([ProvingKey.from(pkSrc), R1CS.from(r1csSrc)]);
+    return new ZKey(pk, r1cs);
+  }
+  /** Same as {@link from} but skips on-curve checks on the PK. Only safe for trusted keys. */
+  static async fromUnchecked(
+    pkSrc: Response | Promise<Response>,
+    r1csSrc: Response | Promise<Response>,
+  ): Promise<ZKey> {
+    const [pk, r1cs] = await Promise.all([ProvingKey.fromUnchecked(pkSrc), R1CS.from(r1csSrc)]);
+    return new ZKey(pk, r1cs);
+  }
+  free(): void {
+    this.pk.free();
+    this.r1cs.free();
+  }
+  [Symbol.dispose](): void {
+    this.free();
+  }
 }
 
+/**
+ * Full witness. Build from a Noir `CompiledCircuit` and the gzipped
+ * witness-stack blob returned by `Noir#execute(...).witness`.
+ */
+export class Witness {
+  /** @internal */ readonly inner: Wasm.Witness;
+  constructor(circuit: CompiledCircuit, witnessStackBytes: Uint8Array) {
+    this.inner = new (requireMod().Witness)(circuit.bytecode, witnessStackBytes);
+  }
+  /** Concatenated 32-byte big-endian limbs of the public witness slots. */
+  publicBytes(): Uint8Array { return this.inner.public_bytes(); }
+  /** Concatenated 32-byte big-endian limbs of the private witness slots. */
+  privateBytes(): Uint8Array { return this.inner.private_bytes(); }
+  free(): void { this.inner.free(); }
+  [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
+}
+
+/**
+ * Groth16+BSB22 proof.
+ */
 export class Proof {
   /** @internal */ readonly inner: Wasm.Proof;
   /** @internal */ constructor(inner: Wasm.Proof) { this.inner = inner; }
@@ -154,8 +196,15 @@ export class Proof {
   [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
 }
 
-export function prove(r1cs: R1CS, witness: GnarkWitness, pk: ProvingKey): Proof {
-  return new Proof(requireMod().prove(r1cs.inner, witness.inner, pk.inner));
+/** Execute the `circuit` on `input`, then prove against the bundled `ZKey`. */
+export async function prove(
+  input: InputMap,
+  circuit: CompiledCircuit,
+  zkey: ZKey,
+): Promise<Proof> {
+  const { witness } = await new Noir(circuit).execute(input);
+  using gw = new Witness(circuit, witness);
+  return new Proof(requireMod().prove(zkey.r1cs.inner, gw.inner, zkey.pk.inner));
 }
 
 export type { Variant } from './_probe_features.js';

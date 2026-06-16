@@ -1,6 +1,6 @@
 import wasmInit, {
   initThreadPool,
-  GnarkWitness,
+  Witness,
   R1CS,
   ProvingKey,
   Proof,
@@ -8,7 +8,7 @@ import wasmInit, {
 } from '../wasm-sisd-mt/sunspot_wasm.js';
 import { makeMtInit } from './_init.js';
 
-export { GnarkWitness, R1CS, ProvingKey, Proof, prove };
+export { Witness, R1CS, ProvingKey, Proof, prove };
 export * from './noir.js';
 export type { MtInitOptions as InitOptions } from './_init.js';
 

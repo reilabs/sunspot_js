@@ -7,5 +7,5 @@ export type {
   ForeignCallHandler,
   ForeignCallInput,
   ForeignCallOutput,
-  CompiledCircuit,
+  CompiledCircuit as Circuit,
 } from '@noir-lang/noir_js';

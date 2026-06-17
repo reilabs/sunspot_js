@@ -76,6 +76,10 @@ const inputs: InputMap = { x: '0x1', y: '0x2' };
 const proof = await prove(inputs, circuit, zkey);
 ```
 
+For instructions on how to generate the assets needed to build proof, such as
+proving keys (.pk), compiled circuits (.json), and constraint files (.ccs),
+see the [Sunspot docs](https://github.com/reilabs/sunspot?tab=readme-ov-file)
+
 Pinning a specific build is just an import-path change — the API is
 identical:
 

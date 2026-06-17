@@ -3,7 +3,6 @@ name: Publish @reilabs/sunspot_js
 on:
   push:
     branches: [main]
-    tags: ['v*']
     paths:
       - 'js/package.json'
       - 'src/**'
@@ -40,7 +39,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Decides whether the publish job should run.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should-publish: ${{ steps.check.outputs.should-publish }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Decide whether to publish
+        id: check
+        run: |
+          VERSION=$(node -p "require('./js/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # only run if the version isn't on npm yet.
+          if npm view "@reilabs/sunspot_js@$VERSION" version --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
+            echo "should-publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::@reilabs/sunspot_js@$VERSION already on npm — nothing to do"
+          else
+            echo "should-publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
+    needs: gate
+    if: needs.gate.outputs.should-publish == 'true'
     runs-on: ubuntu-latest
     environment: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry-run == false)) && 'npm' || '' }}
     steps:
@@ -67,21 +95,6 @@ jobs:
         working-directory: js
         run: yarn install --frozen-lockfile
 
-      # Skip without failing if this version is already on npm 
-      - name: Check whether this version is already published
-        id: check
-        run: |
-          PKG=$(node -p "require('./js/package.json').version")
-          echo "version=$PKG" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" != "push" ]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          elif npm view "@reilabs/sunspot_js@$PKG" version --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::@reilabs/sunspot_js@$PKG already on npm — nothing to do"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
       # Dry-run policy:
       #   pull_request      → always dry-run (verifies build, never publishes)
       #   push (main)       → real publish
@@ -96,19 +109,16 @@ jobs:
           esac
 
       - name: Build wasm + ts
-        if: steps.check.outputs.skip == 'false'
         working-directory: js
         run: yarn build
 
       - name: Dry-run pack
-        if: steps.check.outputs.skip == 'false'
         working-directory: js
         run: npm pack --dry-run --ignore-scripts
 
       # `--provenance` requires `id-token: write`, which fork PRs don't get;
       # safer to skip it during dry-runs (no attestation is recorded anyway).
       - name: Publish
-        if: steps.check.outputs.skip == 'false'
         working-directory: js
         run: |
           if [ "${{ steps.mode.outputs.dry-run }}" = "true" ]; then

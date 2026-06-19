@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-EXPECTED_NARGO_VERSION="1.0.0-beta.18"
+EXPECTED_NARGO_VERSION="1.0.0-beta.22"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECTS_DIR="${SCRIPT_DIR}/noir_projects"

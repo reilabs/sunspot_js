@@ -110,5 +110,5 @@ impl<'a> Solver<'a> {
 }
 
 fn fe_to_fr(fe: &FieldElement) -> Fr {
-    Fr::new_unchecked(ark_ff::BigInt(fe.into_repr().0.0))
+    Fr::from(fe.into_repr())
 }

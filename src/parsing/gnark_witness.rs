@@ -52,49 +52,47 @@ impl GnarkWitness {
         }
         items.reverse();
 
-        let outer = items
-            .last()
-            .ok_or_else(|| ParseError::Witness("witness stack is empty".into()))?;
-        let outer_circuit = program.functions.get(outer.index as usize).ok_or_else(|| {
-            ParseError::Acir(format!(
-                "outermost stack references function {} but program has {} functions",
-                outer.index,
-                program.functions.len()
-            ))
-        })?;
-
-        let mut public = Vec::with_capacity(outer_circuit.public_parameters.0.len());
-        for witness in &outer_circuit.public_parameters.0 {
-            let value = outer.witness.get(witness).ok_or_else(|| {
-                ParseError::Witness(format!(
-                    "public parameter {witness} missing from outermost witness map"
-                ))
-            })?;
-            public.push(*value);
-        }
-
-        let mut private = Vec::new();
-        let last_idx = items.len() - 1;
-        for (i, item) in items.iter().enumerate() {
-            let circuit = program.functions.get(item.index as usize).ok_or_else(|| {
+        let (public, outer_public) = {
+            let outer = items
+                .last()
+                .ok_or_else(|| ParseError::Witness("witness stack is empty".into()))?;
+            let outer_circuit = program.functions.get(outer.index as usize).ok_or_else(|| {
                 ParseError::Acir(format!(
-                    "stack item references function {} but program has {} functions",
-                    item.index,
+                    "outermost stack references function {} but program has {} functions",
+                    outer.index,
                     program.functions.len()
                 ))
             })?;
+
+            let mut public = Vec::with_capacity(outer_circuit.public_parameters.0.len());
+            for witness in &outer_circuit.public_parameters.0 {
+                let value = outer.witness.get(witness).ok_or_else(|| {
+                    ParseError::Witness(format!(
+                        "public parameter {witness} missing from outermost witness map"
+                    ))
+                })?;
+                public.push(*value);
+            }
+
+            (public, outer_circuit.public_parameters.0.clone())
+        };
+
+        let last_idx = items.len() - 1;
+        let mut private = Vec::new();
+        for (i, item) in items.into_iter().enumerate() {
             let is_outer = i == last_idx;
-            for j in 0..=circuit.current_witness_index {
-                let w = Witness(j);
-                if is_outer && outer_circuit.public_parameters.0.contains(&w) {
-                    continue;
+            let mut index: u32 = 0;
+            for (w, value) in item.witness {
+                while index < w.0 {
+                    if !(is_outer && outer_public.contains(&Witness(index))) {
+                        private.push(FieldElement::zero());
+                    }
+                    index += 1;
                 }
-                let value = item
-                    .witness
-                    .get(&w)
-                    .copied()
-                    .unwrap_or_else(FieldElement::zero);
-                private.push(value);
+                if !(is_outer && outer_public.contains(&w)) {
+                    private.push(value);
+                }
+                index += 1;
             }
         }
 

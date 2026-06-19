@@ -1,6 +1,6 @@
 [package]
 name = "sunspot_wasm"
-version = "1.0.0"
+version = "2.0.0"
 edition = "2024"
 
 [lib]
@@ -20,7 +20,7 @@ local-curve = ["dep:bn254-multiplier"]
 bench = ["dep:console_error_panic_hook"]
 
 [dependencies]
-acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.18", features = ["bn254"] }
+acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.22", features = ["bn254"] }
 ark-bn254 = { version = "0.6", default-features = false, features = ["curve"] }
 ark-ec = { version = "0.6", default-features = false }
 ark-ff = { version = "0.6", default-features = false }

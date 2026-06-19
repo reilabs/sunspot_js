@@ -1,6 +1,6 @@
 {
   "name": "@reilabs/sunspot_js",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Groth16 prover for Noir circuits in browser.",
   "license": "Apache-2.0",
   "repository": {
@@ -66,7 +66,7 @@
     "prepack": "yarn clean && yarn build"
   },
   "dependencies": {
-    "@noir-lang/noir_js": "1.0.0-beta.18"
+    "@noir-lang/noir_js": "1.0.0-beta.22"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

@@ -118,8 +118,7 @@ jobs:
         working-directory: sunspot/go
         run: |
           set -euxo pipefail
-          go mod tidy
-          go build -o sunspot -v .
+          go build -o sunspot -v ./cmd/sunspot
           mkdir -p "$GITHUB_WORKSPACE/sunspot-bin"
           mv sunspot "$GITHUB_WORKSPACE/sunspot-bin/sunspot"
 

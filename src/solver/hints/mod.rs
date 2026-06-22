@@ -159,7 +159,8 @@ const HID_XOR: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/uints.xorHint
 const HID_AND: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/uints.andHint");
 const HID_OR: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/uints.orHint");
 const HID_TO_BYTES: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/uints.toBytes");
-const HID_SPLIT_TO_64: u32 = fnv1a32(b"sunspot/go/acir/black_box_func.splitInto64BitLimbsHint");
+const HID_SPLIT_TO_64: u32 =
+    fnv1a32(b"github.com/reilabs/sunspot/go/acir/black_box_func.splitInto64BitLimbsHint");
 const HID_PARTITION: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/bitslice.partitionHint");
 const HID_EMU_MUL: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/emulated.mulHint");
 const HID_EMU_DIV: u32 = fnv1a32(b"github.com/consensys/gnark/std/math/emulated.DivHint");
@@ -168,8 +169,9 @@ const HID_DIV_E2: u32 =
     fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/fields_bn254.divE2Hint");
 const HID_INVERSE_E12: u32 =
     fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/fields_bn254.inverseE12Hint");
-const HID_GRUMPKIN_DECOMPOSE_SCALAR: u32 = fnv1a32(b"sunspot/go/sw-grumpkin.decomposeScalar");
-const HID_GRUMPKIN_DECOMPOSE: u32 = fnv1a32(b"sunspot/go/sw-grumpkin.decompose");
+const HID_GRUMPKIN_DECOMPOSE_SCALAR: u32 =
+    fnv1a32(b"github.com/reilabs/sunspot/go/sw-grumpkin.decomposeScalar");
+const HID_GRUMPKIN_DECOMPOSE: u32 = fnv1a32(b"github.com/reilabs/sunspot/go/sw-grumpkin.decompose");
 const HID_SW_DECOMPOSE_SCALAR_G1: u32 =
     fnv1a32(b"github.com/consensys/gnark/std/algebra/emulated/sw_emulated.decomposeScalarG1");
 const HID_SW_SCALAR_MUL: u32 =

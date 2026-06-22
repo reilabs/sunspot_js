@@ -1,4 +1,4 @@
-//! `sunspot/go/sw-grumpkin.decompose`: 1 input (`s`), 4 outputs — the four
+//! `github.com/reilabs/sunspot/go/sw-grumpkin.decompose`: 1 input (`s`), 4 outputs — the four
 //! 64-bit little-endian limbs of `s`. Mirrors gnark's per-circuit helper that
 //! cracks a native scalar into limbs so it can be re-bound as an
 //! `Element[BN254Fp]` for the GLV equality check.

@@ -1,4 +1,4 @@
-//! `sunspot/go/sw-grumpkin.decomposeScalar`: GLV decomposition of a native
+//! `github.com/reilabs/sunspot/go/sw-grumpkin.decomposeScalar`: GLV decomposition of a native
 //! BN254-Fr scalar `s` into two BN254-Fp emulated outputs `(s1, s2)` such
 //! that `s1 + λ · s2 ≡ s (mod r_grumpkin)`, where `r_grumpkin = p_bn254`.
 //!

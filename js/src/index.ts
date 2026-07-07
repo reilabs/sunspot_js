@@ -174,6 +174,8 @@ export class Witness {
   publicBytes(): Uint8Array { return this.inner.public_bytes(); }
   /** Concatenated 32-byte big-endian limbs of the private witness slots. */
   privateBytes(): Uint8Array { return this.inner.private_bytes(); }
+  /** Public witness in gnark's `MarshalBinary` format. */
+  gnarkFormatPublicBytes(): Uint8Array { return this.inner.gnark_format_public_bytes(); }
   free(): void { this.inner.free(); }
   [Symbol.dispose](): void { this.inner[Symbol.dispose](); }
 }

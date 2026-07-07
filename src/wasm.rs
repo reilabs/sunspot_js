@@ -48,6 +48,20 @@ impl Witness {
     pub fn private_bytes(&self) -> Vec<u8> {
         flatten(&self.0.private)
     }
+
+    /// Public witness in gnark's `MarshalBinary` format:
+    ///  12-byte big-endian header followed by the concatenated
+    ///  32-byte big-endian public entries.
+    pub fn gnark_format_public_bytes(&self) -> Vec<u8> {
+        let body = self.public_bytes();
+        let n = self.0.public.len() as u32;
+        let mut out = Vec::with_capacity(12 + body.len());
+        out.extend_from_slice(&n.to_be_bytes());
+        out.extend_from_slice(&0u32.to_be_bytes());
+        out.extend_from_slice(&n.to_be_bytes());
+        out.extend_from_slice(&body);
+        out
+    }
 }
 
 fn flatten(elems: &[acir::FieldElement]) -> Vec<u8> {

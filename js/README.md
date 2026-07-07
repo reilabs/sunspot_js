@@ -111,7 +111,7 @@ import { init, prove } from '@reilabs/sunspot_js/sisd-st'; // scalar fallback, s
 - `class ZKey(pk, r1cs)` — bundles a proving key and R1CS.
   - `ZKey.from(pkResponse, r1csResponse)` — load both from `fetch()` responses.
   - `ZKey.fromUnchecked(pkResponse, r1csResponse)` — same but skips on-curve checks on the PK. Only safe for trusted keys.
-- `class Witness(circuit, witnessStackBytes)` — build the gnark-ordered partial witness from a Noir `CompiledCircuit` and the `Noir#execute(...).witness` witness map. Exposes `privateBytes()` and `publicBytes()` (concatenated 32-byte big-endian limbs).
+- `class Witness(circuit, witnessStackBytes)` — gnark-ordered partial witness. Exposes `publicBytes()` / `privateBytes()` (concatenated 32-byte BE limbs), and `gnarkFormatPublicBytes()` (public witness in gnark `MarshalBinary` / `.pw` format — the form Sunspot-produced verifiers expect).
 - `class Proof` — `asBytes()`, `arBytes()`, `bsBytes()`, `krsBytes()`, `commitmentsBytes()`, `commitmentPokBytes()`, `nbCommitments()`, `isValid()`.
 - `prove(input, circuit, zkey): Promise<Proof>` — witness-gen + prove in one call.
 

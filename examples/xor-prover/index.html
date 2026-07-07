@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>xor proof — sunspot_js</title>
+  <style>
+    body { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 2rem; max-width: 40ch; }
+    h1 { font-size: 18px; }
+    label { display: inline-block; width: 2ch; }
+    input { width: 8ch; font: inherit; padding: 0.2rem; }
+    button { font: inherit; padding: 0.4rem 0.8rem; margin-top: 1rem; }
+    #out { margin-top: 1rem; min-height: 1.5rem; }
+    .ok  { color: #0a0; }
+    .err { color: #b00; }
+  </style>
+</head>
+<body>
+  <h1>xor proof</h1>
+  <p>Prove <code>x ^ y == z</code>.</p>
+  <p>
+    <label for="x">x</label><input id="x" value="7"><br>
+    <label for="y">y</label><input id="y" value="2"><br>
+    <label for="z">z</label><input id="z" value="5">
+  </p>
+  <button id="go">Execute and prove</button>
+  <div id="out"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

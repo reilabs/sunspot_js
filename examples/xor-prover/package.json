@@ -1,0 +1,16 @@
+{
+  "name": "xor-prover-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "node": "node node.mjs"
+  },
+  "dependencies": {
+    "@reilabs/sunspot_js": "^2.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0"
+  }
+}

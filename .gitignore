@@ -103,3 +103,4 @@ js/wasm-sisd-st/
 js/*.tgz
 .yarn/
 .pnp.*
+dist/

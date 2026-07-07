@@ -9,9 +9,9 @@ use ark_ff::{BigInteger, PrimeField};
 use gnark_verifier_solana::{GnarkProof, GnarkVerifier, GnarkWitness, parse_vk};
 use sunspot_wasm::curve::{G1Affine, G2Affine};
 
-use sunspot_wasm::{GnarkWitness as SunspotWitness, Proof, prove, solve};
+use sunspot_wasm::{Proof, Witness, prove, solve};
 
-use crate::{gnark_witness, proving_key, r1cs};
+use crate::{proving_key, r1cs, witness};
 
 #[test]
 fn polynomial() {
@@ -45,7 +45,7 @@ fn passport_like() {
 
 fn run<const NR_INPUTS: usize, const N_COMMITMENTS: usize>(name: &str) {
     let r1cs = r1cs(name);
-    let partial = gnark_witness(name);
+    let partial = witness(name);
     let pk = proving_key(name);
 
     let pk_keys = if pk.commitment_keys.is_empty() {
@@ -118,7 +118,7 @@ fn to_gnark_proof<const N_COMMITMENTS: usize>(p: &Proof) -> GnarkProof<N_COMMITM
     }
 }
 
-fn to_gnark_witness<const NR_INPUTS: usize>(w: &SunspotWitness) -> GnarkWitness<NR_INPUTS> {
+fn to_gnark_witness<const NR_INPUTS: usize>(w: &Witness) -> GnarkWitness<NR_INPUTS> {
     assert_eq!(
         w.public.len(),
         NR_INPUTS,

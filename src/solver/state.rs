@@ -3,7 +3,7 @@ use acir::FieldElement;
 use ark_ff::{One, Zero};
 
 use super::error::SolveError;
-use crate::{GnarkWitness, PedersenProvingKey, R1CS};
+use crate::{Witness, PedersenProvingKey, R1CS};
 
 /// Solver state: full witness vector + parallel "solved" bitmap.
 pub struct Solver<'a> {
@@ -18,10 +18,10 @@ impl<'a> Solver<'a> {
     /// caller's public + secret values. Internal wires start unsolved.
     ///
     /// `body.public` includes the implicit constant-1 wire as its first entry,
-    /// so `gnark_witness.public.len() == body.public.len() - 1`.
+    /// so `partial_witness.public.len() == body.public.len() - 1`.
     pub fn new(
         r1cs: &'a R1CS,
-        gnark_witness: &GnarkWitness,
+        partial_witness: &Witness,
         pk: Option<&'a [PedersenProvingKey]>,
     ) -> Result<Self, SolveError> {
         let nb_public = r1cs.body.public.len();
@@ -29,17 +29,17 @@ impl<'a> Solver<'a> {
         let nb_secret = r1cs.body.secret.len();
         let nb_internal = r1cs.body.nb_internal_variables as usize;
 
-        if gnark_witness.public.len() != nb_user_public {
+        if partial_witness.public.len() != nb_user_public {
             return Err(SolveError::WitnessLengthMismatch {
                 label: "public",
-                actual: gnark_witness.public.len(),
+                actual: partial_witness.public.len(),
                 expected: nb_user_public,
             });
         }
-        if gnark_witness.private.len() != nb_secret {
+        if partial_witness.private.len() != nb_secret {
             return Err(SolveError::WitnessLengthMismatch {
                 label: "secret",
-                actual: gnark_witness.private.len(),
+                actual: partial_witness.private.len(),
                 expected: nb_secret,
             });
         }
@@ -50,11 +50,11 @@ impl<'a> Solver<'a> {
 
         witness[0] = Fr::one();
         solved[0] = true;
-        for (i, fe) in gnark_witness.public.iter().enumerate() {
+        for (i, fe) in partial_witness.public.iter().enumerate() {
             witness[1 + i] = fe_to_fr(fe);
             solved[1 + i] = true;
         }
-        for (i, fe) in gnark_witness.private.iter().enumerate() {
+        for (i, fe) in partial_witness.private.iter().enumerate() {
             witness[nb_public + i] = fe_to_fr(fe);
             solved[nb_public + i] = true;
         }

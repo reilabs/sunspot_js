@@ -2,22 +2,22 @@
 use acir::AcirField;
 use acir::FieldElement;
 use acir::circuit::Program;
-use acir::native_types::{Witness, WitnessStack};
+use acir::native_types::{Witness as ACIRWitness, WitnessStack};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 
-use crate::GnarkWitness;
+use crate::Witness;
 
 use super::ParseError;
 
 /// Witness vector laid out the way gnark expects: public values first
 /// (matching the order of the outermost circuit's public parameters), then
 /// every remaining circuit witness slot.
-impl GnarkWitness {
+impl Witness {
     pub fn from_bytes(
         acir_json_bytes: &[u8],
         witness_stack_bytes: &[u8],
-    ) -> Result<GnarkWitness, ParseError> {
+    ) -> Result<Self, ParseError> {
         let program = parse_acir_program(acir_json_bytes)?;
         Self::from_program(program, witness_stack_bytes)
     }
@@ -26,7 +26,7 @@ impl GnarkWitness {
     pub fn from_bytecode(
         bytecode_b64: &str,
         witness_stack_bytes: &[u8],
-    ) -> Result<GnarkWitness, ParseError> {
+    ) -> Result<Self, ParseError> {
         let program = parse_acir_bytecode(bytecode_b64)?;
         Self::from_program(program, witness_stack_bytes)
     }
@@ -34,7 +34,7 @@ impl GnarkWitness {
     fn from_program(
         program: Program<FieldElement>,
         witness_stack_bytes: &[u8],
-    ) -> Result<GnarkWitness, ParseError> {
+    ) -> Result<Self, ParseError> {
         let witness_stack = WitnessStack::<FieldElement>::deserialize(witness_stack_bytes)
             .map_err(|e| ParseError::Witness(format!("deserialize witness stack: {e}")))?;
         Self::get_witness(program, witness_stack)
@@ -44,7 +44,7 @@ impl GnarkWitness {
     fn get_witness(
         program: Program<FieldElement>,
         witness_stack: WitnessStack<FieldElement>,
-    ) -> Result<GnarkWitness, ParseError> {
+    ) -> Result<Self, ParseError> {
         let mut stack = witness_stack;
         let mut items = Vec::with_capacity(stack.length());
         while let Some(item) = stack.pop() {
@@ -84,7 +84,7 @@ impl GnarkWitness {
             let mut index: u32 = 0;
             for (w, value) in item.witness {
                 while index < w.0 {
-                    if !(is_outer && outer_public.contains(&Witness(index))) {
+                    if !(is_outer && outer_public.contains(&ACIRWitness(index))) {
                         private.push(FieldElement::zero());
                     }
                     index += 1;
@@ -96,7 +96,7 @@ impl GnarkWitness {
             }
         }
 
-        Ok(GnarkWitness { public, private })
+        Ok(Self { public, private })
     }
 }
 

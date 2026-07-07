@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use sunspot_wasm::{GnarkWitness, ProvingKey, R1CS};
+use sunspot_wasm::{ProvingKey, R1CS, Witness};
 
 mod curve;
 mod parsing;
@@ -17,11 +17,11 @@ pub fn proving_key(name: &str) -> ProvingKey {
     ProvingKey::load(&path).unwrap_or_else(|e| panic!("ProvingKey::load {}: {e}", path.display()))
 }
 
-pub fn gnark_witness(name: &str) -> GnarkWitness {
+pub fn witness(name: &str) -> Witness {
     let acir = read(&artifact(name, "json"));
     let witness = read(&artifact(name, "gz"));
-    GnarkWitness::from_bytes(&acir, &witness)
-        .unwrap_or_else(|e| panic!("GnarkWitness::from_bytes for `{name}`: {e}"))
+    Witness::from_bytes(&acir, &witness)
+        .unwrap_or_else(|e| panic!("Witness::from_bytes for `{name}`: {e}"))
 }
 
 fn artifact(name: &str, ext: &str) -> PathBuf {

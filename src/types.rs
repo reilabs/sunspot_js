@@ -1,6 +1,6 @@
-mod gnark_witness;
 mod pk;
 mod proof;
 mod r1cs;
+mod witness;
 
-pub use {gnark_witness::GnarkWitness, pk::*, proof::Proof, r1cs::*};
+pub use {pk::*, proof::Proof, r1cs::*, witness::Witness};

@@ -17,6 +17,4 @@ pub use error::Error;
 pub use pedersen_commitments::{BSB22_FOLD_DST, COMMITMENT_DST, FR_BYTES, bsb22_pok, fold};
 pub use prover::{ProveError, prove};
 pub use solver::{SolveOutput, Solver, solve, verify_witness};
-pub use types::{
-    CommitmentInfo, GnarkWitness, PedersenProvingKey, Proof, ProvingKey, R1CS, SystemType,
-};
+pub use types::{CommitmentInfo, PedersenProvingKey, Proof, ProvingKey, R1CS, SystemType, Witness};

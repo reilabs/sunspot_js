@@ -26,7 +26,7 @@ fn err(e: impl std::fmt::Display) -> JsError {
 }
 
 #[wasm_bindgen]
-pub struct Witness(types::GnarkWitness);
+pub struct Witness(types::Witness);
 
 #[wasm_bindgen]
 impl Witness {
@@ -34,7 +34,7 @@ impl Witness {
     /// and a gzipped witness-stack (`*.gz`) blob.
     #[wasm_bindgen(constructor)]
     pub fn new(bytecode: &str, witness_stack_bytes: &[u8]) -> Result<Witness, JsError> {
-        types::GnarkWitness::from_bytecode(bytecode, witness_stack_bytes)
+        types::Witness::from_bytecode(bytecode, witness_stack_bytes)
             .map(Witness)
             .map_err(err)
     }

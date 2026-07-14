@@ -21,7 +21,7 @@ use ark_std::cfg_iter;
 use rayon::prelude::*;
 
 use crate::types::CommitmentInfo;
-use crate::{GnarkWitness, PedersenProvingKey, R1CS, types::Blueprint};
+use crate::{Witness, PedersenProvingKey, R1CS, types::Blueprint};
 use hints::{solve_generic_hint, solve_lookup};
 
 use self::cursor::Cursor;
@@ -61,7 +61,7 @@ pub(super) enum InstrOutput {
 /// Returns full witness vector and per-row R1CS evaluations.
 pub fn solve(
     r1cs: &R1CS,
-    witness: &GnarkWitness,
+    witness: &Witness,
     pk: Option<&[PedersenProvingKey]>,
 ) -> Result<SolveOutput, SolveError> {
     let solver = Solver::new(r1cs, witness, pk)?;

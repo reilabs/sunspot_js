@@ -173,14 +173,14 @@ pub fn bench_parse_proving_key_unchecked_batched(
 }
 
 #[wasm_bindgen]
-pub fn bench_parse_gnark_witness(
+pub fn bench_parse_witness(
     acir_json: &[u8],
     witness_stack: &[u8],
     iterations: u32,
 ) -> Result<BenchResult, JsError> {
-    GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    Witness::from_bytes(acir_json, witness_stack).map_err(err)?;
     Ok(run(iterations, || {
-        GnarkWitness::from_bytes(black_box(acir_json), black_box(witness_stack)).unwrap()
+        Witness::from_bytes(black_box(acir_json), black_box(witness_stack)).unwrap()
     }))
 }
 
@@ -199,7 +199,7 @@ pub fn bench_solve(
     iterations: u32,
 ) -> Result<BenchResult, JsError> {
     let r1cs = R1CS::from_bytes(ccs_bytes).map_err(err)?;
-    let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    let witness = Witness::from_bytes(acir_json, witness_stack).map_err(err)?;
     let pk = pk_bytes
         .as_deref()
         .map(ProvingKey::from_bytes_unchecked)
@@ -228,7 +228,7 @@ pub fn bench_prove(
     iterations: u32,
 ) -> Result<BenchResult, JsError> {
     let r1cs = R1CS::from_bytes(ccs_bytes).map_err(err)?;
-    let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    let witness = Witness::from_bytes(acir_json, witness_stack).map_err(err)?;
     let pk = ProvingKey::from_bytes_unchecked(pk_bytes).map_err(err)?;
     let commitment_keys = if pk.commitment_keys.is_empty() {
         None
@@ -304,7 +304,7 @@ pub fn bench_prove_stages(
 ) -> Result<ProveStagesResult, JsError> {
     assert!(iterations > 0, "iterations must be > 0");
     let r1cs = R1CS::from_bytes(ccs_bytes).map_err(err)?;
-    let witness = GnarkWitness::from_bytes(acir_json, witness_stack).map_err(err)?;
+    let witness = Witness::from_bytes(acir_json, witness_stack).map_err(err)?;
     let pk = ProvingKey::from_bytes_unchecked(pk_bytes).map_err(err)?;
     let commitment_keys = if pk.commitment_keys.is_empty() {
         None

@@ -1,8 +1,8 @@
-use crate::gnark_witness;
+use crate::witness;
 use acir::AcirField;
 #[test]
 fn sum_a_b() {
-    let w = gnark_witness("sum_a_b");
+    let w = witness("sum_a_b");
 
     // Only `z` is public in `sum_a_b(x, y, z: pub)`.
     assert_eq!(w.public.len(), 1, "public should contain only z");
